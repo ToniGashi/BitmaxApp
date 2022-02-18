@@ -3,7 +3,7 @@ BEGIN;
 CREATE TABLE users (
     id SERIAL PRIMARY KEY NOT NULL,
     email text UNIQUE NOT NULL,
-    dpassword text NOT NULL,
+    dhash text NOT NULL,
     session_data text
 );
 
@@ -24,6 +24,6 @@ CREATE TABLE ticker_data (
     price DECIMAL
 );
 
-INSERT INTO users (email, dpassword) values ('tonigashi@gmail.com', '$2b$10$B3KkKy4IaUpwsZLLNb0SH.gmIqiaweruymA0pEAKfZOAfnCNTOguC');
+INSERT INTO users (email, dhash) values ('tonigashi@gmail.com', '$2a$10$Zaj07zmXgC7MmV/BjMdo2e5RSZa/Kbh4DmM5qDZXoFPN/k7fzFvq2');
 
 COMMIT;
