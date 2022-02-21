@@ -3,7 +3,7 @@ BEGIN;
 CREATE TABLE users (
     id SERIAL PRIMARY KEY NOT NULL,
     email text UNIQUE NOT NULL,
-    password text NOT NULL,
+    dpassword text NOT NULL,
     session_data text
 );
 
@@ -23,7 +23,5 @@ CREATE TABLE ticker_data (
     Dat VARCHAR(255),
     price DECIMAL
 );
-
-
 
 COMMIT;
