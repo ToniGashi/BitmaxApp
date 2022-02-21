@@ -23,5 +23,7 @@ CREATE TABLE ticker_data (
     Dat VARCHAR(255),
     price DECIMAL
 );
+
 INSERT INTO users (email, dhash) values ('tonigashi@gmail.com', '$2a$10$Zaj07zmXgC7MmV/BjMdo2e5RSZa/Kbh4DmM5qDZXoFPN/k7fzFvq2');
+
 COMMIT;

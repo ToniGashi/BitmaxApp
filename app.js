@@ -5,10 +5,7 @@ const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 const { authenticateJWT } = require('./middleware/authJWT')
 const { dbConnector } = require('./middleware/dbConnect');
-<<<<<<< HEAD
 const cookieParser = require('cookie-parser');
-=======
->>>>>>> 9a72027 (Changes to backend)
 const port = 3000;
 const app = express();
 
@@ -25,11 +22,7 @@ try {
 }
 
 
-<<<<<<< HEAD
 app.post('/user', authenticateJWT, async function(req, res) {
-=======
-app.post('/createUser', authenticateJWT, async function(req, res) {
->>>>>>> 9a72027 (Changes to backend)
   try {
     const { email, password } = req.body;
     await createUser(email, password, req.pool);
