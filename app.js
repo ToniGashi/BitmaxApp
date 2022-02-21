@@ -86,6 +86,9 @@ function checkRequirements() {
   if(!process.env.JWT_SECRET_TOKEN) {
     errMessage += "Missing JWT_SECRET_TOKEN in the .env file\n"
   }
+  if(!process.env.BCRYPT_ROUNDS) {
+    errMessage += "Missing BCRYPT_ROUNDS in the .env file\n"
+  }
 
   if(errMessage) {
     throw new Error(errMessage);
@@ -129,7 +132,7 @@ async function createUser(email, password, pool) {
   await pool.connect();
 
   console.log('[DEBUG]: Hashing the password');
-  const hash = await bcrypt.hash(password, 10)
+  const hash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS))
 
   console.log('[DEBUG]: Sending the request to database');
   try {
