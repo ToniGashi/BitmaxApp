@@ -86,9 +86,6 @@ function checkRequirements() {
   if(!process.env.JWT_SECRET_TOKEN) {
     errMessage += "Missing JWT_SECRET_TOKEN in the .env file\n"
   }
-  if(!process.env.BCRYPT_SALT) {
-    errMessage += "Missing BCRYPT_SALT in the .env file\n"
-  }
 
   if(errMessage) {
     throw new Error(errMessage);
@@ -132,7 +129,7 @@ async function createUser(email, password, pool) {
   await pool.connect();
 
   console.log('[DEBUG]: Hashing the password');
-  const hash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_SALT))
+  const hash = await bcrypt.hash(password, 10)
 
   console.log('[DEBUG]: Sending the request to database');
   try {
@@ -156,11 +153,6 @@ async function loginUser(email, password, pool) {
   console.log('[DEBUG]: Password validated');
 
   console.log('[DEBUG]: Connecting to database');
-
-  if(email === 'tonigashi@gmail.com') {
-    console.log('[DEBUG]: User logged in successfully');
-    return;
-  }
 
   await pool.connect();
 
