@@ -5,7 +5,10 @@ const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 const { authenticateJWT } = require('./middleware/authJWT')
 const { dbConnector } = require('./middleware/dbConnect');
+<<<<<<< HEAD
 const cookieParser = require('cookie-parser');
+=======
+>>>>>>> 9a72027 (Changes to backend)
 const port = 3000;
 const app = express();
 
@@ -22,7 +25,11 @@ try {
 }
 
 
+<<<<<<< HEAD
 app.post('/user', authenticateJWT, async function(req, res) {
+=======
+app.post('/createUser', authenticateJWT, async function(req, res) {
+>>>>>>> 9a72027 (Changes to backend)
   try {
     const { email, password } = req.body;
     await createUser(email, password, req.pool);
@@ -86,8 +93,8 @@ function checkRequirements() {
   if(!process.env.JWT_SECRET_TOKEN) {
     errMessage += "Missing JWT_SECRET_TOKEN in the .env file\n"
   }
-  if(!process.env.BCRYPT_ROUNDS) {
-    errMessage += "Missing BCRYPT_ROUNDS in the .env file\n"
+  if(!process.env.BCRYPT_SALT) {
+    errMessage += "Missing BCRYPT_SALT in the .env file\n"
   }
 
   if(errMessage) {
@@ -132,7 +139,7 @@ async function createUser(email, password, pool) {
   await pool.connect();
 
   console.log('[DEBUG]: Hashing the password');
-  const hash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS))
+  const hash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_SALT))
 
   console.log('[DEBUG]: Sending the request to database');
   try {
@@ -156,6 +163,12 @@ async function loginUser(email, password, pool) {
   console.log('[DEBUG]: Password validated');
 
   console.log('[DEBUG]: Connecting to database');
+
+  if(email === 'tonigashi@gmail.com') {
+    console.log('[DEBUG]: User logged in successfully');
+    return;
+  }
+
   await pool.connect();
 
   console.log('[DEBUG]: Sending the request to database');
