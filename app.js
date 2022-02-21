@@ -44,15 +44,17 @@ function isValidPassword(pass) {
   if(String(pass).toLowerCase().match(/^(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{7,15}$/)) {
     return true;
   } else {
-    throw false;
+    return false;
   }
 }
 
 async function createUser(email, password) {
   const failedRequirements = checkRequirements()
+
   if(failedRequirements) {
     return failedRequirements;
   }
+
   console.log('=> STARTED CREATE USER <=');
 
   if(!isValidEmail(email)) {
@@ -65,23 +67,29 @@ async function createUser(email, password) {
   }
   console.log('[DEBUG]: Password validated');
 
-  pool.connect();
+  await pool.connect();
+
+  console.log('[DEBUG]: Hashing the password');
+  const hash = await bcrypt.hash(password, 10)
+
+  console.log('[DEBUG]: Sending the request to database');
   try {
-    const response = await pool.query(`INSERT INTO users (email, dpassword) VALUES ('${email}', '${password}')`);
-    if(response){
-      console.log('[DEBUG]: User created successfully');
-      return 'User created successfully';
-    } else {
-      console.log('[DEBUG]: User creation failed');
-      return 'Something unexpected went wrong'
-    }
+    await newQuery(`INSERT INTO users (email, dpassword) VALUES ($1, $2)`, [email, hash], pool);
+    console.log('[DEBUG]: User created successfully');
+    process.exit(1);
   } catch (err) {
-    console.log(err);
-    ret
+    console.log(err.message);
+    process.exit(1);
   }
 }
 
 async function loginUser(email, password) {
+  const failedRequirements = checkRequirements()
+
+  if(failedRequirements) {
+    return failedRequirements;
+  }
+
   console.log('=> STARTED LOGIN USER <=');
   
   if(!isValidEmail(email)) {
@@ -94,20 +102,38 @@ async function loginUser(email, password) {
   }
   console.log('[DEBUG]: Password validated');
 
-  pool.connect();
+  await pool.connect();
+
+  console.log('[DEBUG]: Sending the request to database');
   try {
-    const response = await pool.query(`SELECT * FROM users WHERE email='${email}' AND dpassword='${password}'`);
-    if(response.rowCount>0) {
-      console.log('[DEBUG]: User logged in successfully');
-      return response.data;
+    const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email], pool);
+
+    if (resp.rowCount > 0) {
+      console.log('[DEBUG]: Hashing password');
+      const isValid = await bcrypt.compare(password, resp.rows[0][2]);
+      if (isValid) {
+        console.log(resp);
+        console.log('[DEBUG]: User retrieved successfully');
+        process.exit(1);
+      } else {
+        throw new Error('Wrong password');
+      }
     } else {
-      console.log('[DEBUG]: User not found');
       throw new Error('User not found');
     }
   } catch (err) {
-    console.log(err);
-    throw new Error('Error with the query');
+    console.log(err.message);
+    process.exit(1);
   }
+}
+
+async function newQuery(query, values, pool) {
+  var result = await pool.query({
+      rowMode: 'array',
+      text: query,
+      values
+  });
+  return result;
 }
 
 module.exports = {
@@ -115,6 +141,4 @@ module.exports = {
   loginUser
 }
 
-require('make-runnable/custom')({
-  printOutputFrame: false
-})
+require('make-runnable')
