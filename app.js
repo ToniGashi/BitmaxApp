@@ -37,8 +37,8 @@ app.post('/user', authenticateJWT, async function(req, res) {
 });
 
 app.post('/login', async function(req, res) {
-  const { email, password } = req.body;
   try {
+    const { email, password } = req.body;
     await loginUser(email, password, req.pool)
     const accessToken = jwt.sign({ username: email }, process.env.JWT_SECRET_TOKEN);
     console.log('[DEBUG]: Access token generated');
@@ -54,6 +54,15 @@ app.post('/login', async function(req, res) {
       error: { message: err.message },
     });
   }
+});
+
+app.get('/', function(req, res) {
+  console.log('Server connection is alive');
+});
+
+app.listen(port, function() {
+  console.log(`App listening on port ${port}!`)
+});
 
 function checkRequirements() {
   let errMessage = '';
@@ -85,7 +94,7 @@ function checkRequirements() {
   }
 }
 
-function isValidEmail(email) {
+function validateEmail(email) {
   if(String(email).toLowerCase().match(/^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/)) {
     return true;
   } else {
@@ -95,8 +104,12 @@ function isValidEmail(email) {
   }
 }
 
-function isValidPassword(pass) {
-  if(String(pass).toLowerCase().match(/^(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{7,15}$/)) {
+function validatePassword(pass) {
+  if( /[A-Z]/.test(pass) &&
+      /[a-z]/       .test(pass) &&
+      /[0-9]/       .test(pass) &&
+      /[^A-Za-z0-9]/.test(pass) &&
+      pass.length > 4) {
     return true;
   } else {
     const error =  new Error('Invalid password');
@@ -105,25 +118,16 @@ function isValidPassword(pass) {
   }
 }
 
-async function createUser(email, password) {
-  const failedRequirements = checkRequirements()
-
-  if(failedRequirements) {
-    return failedRequirements;
-  }
-
+async function createUser(email, password, pool) {
   console.log('=> STARTED CREATE USER <=');
 
-  if(!isValidEmail(email)) {
-    return 'Wrong email format';
-  }
+  validateEmail(email);
   console.log('[DEBUG]: Email validated');
 
-  if(!isValidPassword(password)) {
-    return 'Wrong password format';
-  }
+  validatePassword(password);
   console.log('[DEBUG]: Password validated');
 
+  console.log('[DEBUG]: Connecting to database');
   await pool.connect();
 
   console.log('[DEBUG]: Hashing the password');
@@ -141,33 +145,28 @@ async function createUser(email, password) {
   }
 }
 
-async function loginUser(email, password) {
-  const failedRequirements = checkRequirements()
-
-  if(failedRequirements) {
-    return failedRequirements;
-  }
-
+async function loginUser(email, password, pool) {
   console.log('=> STARTED LOGIN USER <=');
   
-  if(!isValidEmail(email)) {
-    return 'Wrong email format';
-  }
+  validateEmail(email);
   console.log('[DEBUG]: Email validated');
 
+  validatePassword(password);
+  console.log('[DEBUG]: Password validated');
+
+  console.log('[DEBUG]: Connecting to database');
   await pool.connect();
 
   console.log('[DEBUG]: Sending the request to database');
   try {
     const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email], pool);
-
-    if (resp.rowCount > 0) {
+    console.log(resp);
+    if (resp.rows.length > 0) {
       console.log('[DEBUG]: Hashing password');
       const isValid = await bcrypt.compare(password, resp.rows[0][2]);
       if (isValid) {
-        console.log(resp);
         console.log('[DEBUG]: User retrieved successfully');
-        process.exit(1);
+        return;
       } else {
         throw new Error('Wrong password');
       }
@@ -187,5 +186,5 @@ async function newQuery(query, values, pool) {
       text: query,
       values
   });
-  return result.rows
+  return result;
 }

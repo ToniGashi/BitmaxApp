@@ -24,23 +24,6 @@ CREATE TABLE ticker_data (
     price DECIMAL
 );
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-INSERT INTO users (email, dpassword) values ('tonigashi@gmail.com', '$2b$10$B3KkKy4IaUpwsZLLNb0SH.gmIqiaweruymA0pEAKfZOAfnCNTOguC');
-=======
-INSERT INTO users (email, dpassword) values ('tonisproject@gmail.com', 'T3stpw!');
-=======
-INSERT INTO users (email, dhash) values ('tonisproject@gmail.com', 'T3stpw!');
->>>>>>> d15c8a2 (hashing passwords)
-
->>>>>>> be0e6fd (task02 initial commit)
-=======
-INSERT INTO users (email, dhash) values ('tonigashi@gmail.com', '$2b$10$B3KkKy4IaUpwsZLLNb0SH.gmIqiaweruymA0pEAKfZOAfnCNTOguC');
->>>>>>> 9a72027 (Changes to backend)
-=======
 INSERT INTO users (email, dhash) values ('tonigashi@gmail.com', '$2a$10$Zaj07zmXgC7MmV/BjMdo2e5RSZa/Kbh4DmM5qDZXoFPN/k7fzFvq2');
->>>>>>> a142ec3 (Fixing task02)
 
 COMMIT;
