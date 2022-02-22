@@ -160,7 +160,6 @@ async function loginUser(email, password, pool) {
   console.log('[DEBUG]: Sending the request to database');
   try {
     const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email], pool);
-    console.log(resp);
     if (resp.rows.length > 0) {
       console.log('[DEBUG]: Hashing password');
       const isValid = await bcrypt.compare(password, resp.rows[0][2]);
