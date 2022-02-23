@@ -5,12 +5,14 @@ const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 const { authenticateJWT } = require('./middleware/authJWT')
 const { dbConnector } = require('./middleware/dbConnect');
+const cookieParser = require('cookie-parser');
 const port = 3000;
 const app = express();
 
 app.use(bodyParser.json());
 app.use(express.json())
 app.use(dbConnector);
+app.use(cookieParser());
 
 try {
   checkRequirements();
@@ -42,11 +44,10 @@ app.post('/login', async function(req, res) {
     await loginUser(email, password, req.pool)
     const accessToken = jwt.sign({ username: email }, process.env.JWT_SECRET_TOKEN);
     console.log('[DEBUG]: Access token generated');
-    process.env.JWT_ACCESS_TOKEN = accessToken;
+    res.cookie('accessToken', accessToken, { maxAge: 900000, httpOnly: true });
     return res.send({
       status: 200,
-      message: 'User login successfully',
-      accessToken
+      message: 'User login successfully'
     })
   } catch (err) {
     console.log('[ERROR]: ', err.message);
