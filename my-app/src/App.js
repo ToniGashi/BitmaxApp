@@ -2,7 +2,8 @@ import { useState } from "react";
 const axiosLib = require('axios');
 
 const axios = axiosLib.create({
-  baseURL: 'http://localhost:3000'
+  baseURL: 'http://localhost:3000',
+  withCredentials: true
 });
 function App() {
   const [email, setName] = useState("");
@@ -10,7 +11,7 @@ function App() {
 
   async function createUser() {
     console.log('creating user');
-    axios.post('/createUser', {
+    axios.post('/user', {
       email, 
       password
     }).then(response => {
@@ -27,7 +28,7 @@ function App() {
         email, 
         password
       })
-      console.log('!!!!!!!!!!!!!!!!!!!!!', res);
+      console.log(res);
     } catch (err) {
       //Document.getElementById('response').innerHTML = err.message
     }

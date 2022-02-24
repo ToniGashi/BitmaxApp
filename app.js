@@ -44,7 +44,7 @@ app.post('/login', async function(req, res) {
     await loginUser(email, password, req.pool)
     const accessToken = jwt.sign({ username: email }, process.env.JWT_SECRET_TOKEN);
     console.log('[DEBUG]: Access token generated');
-    res.cookie('accessToken', accessToken, { maxAge: 900000, httpOnly: true });
+    res.cookie('accessToken', accessToken, { maxAge: 900000 });
     return res.send({
       status: 200,
       message: 'User login successfully'
