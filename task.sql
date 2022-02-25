@@ -8,19 +8,19 @@ CREATE TABLE users (
 );
 
 CREATE TABLE tickers (
-    id SERIAL PRIMARY KEY NOT NULL,
+    id TEXT PRIMARY KEY NOT NULL,
     symbol VARCHAR(255),
-    name VARCHAR(255)
+    name UNIQUE VARCHAR(255)
 );
 
 CREATE TABLE user_tickers (
     user_id int NOT NULL REFERENCES users (id),
-    ticker_id int NOT NULL REFERENCES tickers (id)
+    ticker_id TEXT NOT NULL REFERENCES tickers (id)
 );
 
 CREATE TABLE ticker_data (
-    ticker_id int NOT NULL REFERENCES tickers (id),
-    Dat VARCHAR(255),
+    ticker_id TEXT NOT NULL REFERENCES tickers (id),
+    Date TIMESTAMP,
     price DECIMAL
 );
 
