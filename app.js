@@ -2,11 +2,13 @@ require('dotenv').config()
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { v1: uuidv1 } = require('uuid');
 const bodyParser = require('body-parser');
 const cors = require("cors");
 const { authenticateJWT } = require('./middleware/authJWT')
 const { dbConnector } = require('./middleware/dbConnect');
 const cookieParser = require('cookie-parser');
+const { checkRequirements } = require('./middleware/config');
 const port = 3000;
 const app = express();
 
@@ -29,6 +31,113 @@ try {
   return;
 }
 
+app.get('/ticker', authenticateJWT, async function(req, res) {
+  console.log('=> STARTED GET TICKER <=');
+  try{
+    console.log('[DEBUG]: Sending the request to database');
+    const resp = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id`, [], req.pool);
+    console.log("[DEBUG]: Ticker updated successfully");
+    res.send({
+      message: resp
+    })
+  } catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+})
+
+app.put('/ticker', authenticateJWT, async function(req, res) {
+  console.log('=> STARTED UPDATE TICKER <=');
+  try{
+    const { id, symbol, name, price } = req.body;
+    if(!id || !symbol || !name || !price) {
+      throw new Error('Data missing in request');
+    }
+    const date = new Date();
+    console.log('[DEBUG]: Sending the first request to ticker_data from database');
+    await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id], req.pool);
+    console.log('[DEBUG]: Sending the second request to tickers from database');
+    await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id], req.pool);
+
+    console.log("[DEBUG]: Ticker updated successfully");
+    res.send({
+      status: 200,
+      message: "Ticker updated successfully"
+    })
+  }catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+})
+
+app.delete('/ticker', authenticateJWT, async function(req, res) {
+  console.log('=> STARTED DELETE TICKER <=');
+  try {
+    const { id } = req.body;
+    if(!id) {
+      throw new Error('ID not provided');
+    }
+    await newQuery(`DELETE FROM ticker_data WHERE ticker_id=$1`, [id], req.pool);
+    await newQuery(`DELETE FROM tickers WHERE id=$1`, [id], req.pool);
+    console.log("[DEBUG]: Ticker deleted successfully");
+    res.status(200).send({
+      status: 200,
+      message: "Ticker deleted successfully"
+    })
+  } catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+})
+
+app.post('/ticker', authenticateJWT, async function(req, res) {
+  console.log('=> STARTED CREATE TICKER <=');
+  try {
+    const { price, symbol, name } = req.body;
+    if(!symbol || !name || !price) {
+      throw new Error('Data missing in request');
+    }
+    const date = new Date();
+    await createTicker(date, price, symbol, name, req.pool);
+    console.log("[DEBUG]: Ticker created successfully");
+    return res.send({
+      status: 200,
+      message: 'Ticker created successfully'
+    })
+  } catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+})
+
+async function createTicker(date, price, symbol, name, pool) {
+  console.log('=> STARTED CREATE TICKER <=');
+
+  const id = uuidv1();
+
+  console.log('[DEBUG]: Sending the request to database');
+  try {
+    await newQuery(`INSERT INTO tickers (id, symbol, name) VALUES ($1, $2, $3)`, [id, symbol, name], pool);
+    await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price], pool);
+    console.log('[DEBUG]: User created successfully');
+    return res.send({
+      status: 200,
+      message: 'Ticker created successfully'
+    });
+  } catch (err) {
+    const error =  new Error(err.message)
+    error.statusCode = 400
+    throw error;
+  }
+}
 
 app.post('/user', authenticateJWT, async function(req, res) {
   try {
@@ -41,7 +150,7 @@ app.post('/user', authenticateJWT, async function(req, res) {
   } catch (err) {
     console.log('[ERROR]: ', err.message);
     return res.status(err.statusCode || 500).send({
-      error: { message: err.message },
+      error: { message: err.message, status:err.statusCode },
     });
   }
 });
@@ -59,8 +168,8 @@ app.post('/login', async function(req, res) {
     })
   } catch (err) {
     console.log('[ERROR]: ', err.message);
-    return res.status(err.statusCode || 500).send({
-      error: { message: err.message },
+    res.status(err.statusCode || 500).send({
+      error: { message: err.message, status:err.statusCode },
     });
   }
 });
@@ -72,36 +181,6 @@ app.get('/', function(req, res) {
 app.listen(port, function() {
   console.log(`App listening on port ${port}!`)
 });
-
-function checkRequirements() {
-  let errMessage = '';
-
-  if(!process.env.DB_USER) {
-    errMessage += "Missing DB_USER in the .env file\n"
-  }
-  if(!process.env.DB_PASSWORD) {
-    errMessage += "Missing DB_PASSWORD in the .env file\n"
-  }
-  if(!process.env.DB_HOST) {
-    errMessage += "Missing DB_HOST in the .env file\n"
-  }
-  if(!process.env.DB_PORT) {
-    errMessage += "Missing DB_PORT in the .env file\n"
-  }
-  if(!process.env.DB_DATABASE) {
-    errMessage += "Missing DB_DATABASE in the .env file\n"
-  }
-  if(!process.env.JWT_SECRET_TOKEN) {
-    errMessage += "Missing JWT_SECRET_TOKEN in the .env file\n"
-  }
-  if(!process.env.BCRYPT_ROUNDS) {
-    errMessage += "Missing BCRYPT_ROUNDS in the .env file\n"
-  }
-
-  if(errMessage) {
-    throw new Error(errMessage);
-  }
-}
 
 function validateEmail(email) {
   if(String(email).toLowerCase().match(/^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/)) {
@@ -138,9 +217,6 @@ async function createUser(email, password, pool) {
     throw error;
   }
 
-  console.log('[DEBUG]: Connecting to database');
-  await pool.connect();
-
   console.log('[DEBUG]: Hashing the password');
   const hash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS))
 
@@ -167,15 +243,17 @@ async function loginUser(email, password, pool) {
     throw error;
   }
 
+<<<<<<< HEAD
   console.log('[DEBUG]: Connecting to database');
   await pool.connect();
 
+=======
+>>>>>>> d89d018 (Fixing CSS, CORS, adding functionality to notify and fixing all the comments in the PR)
   console.log('[DEBUG]: Sending the request to database');
   try {
     const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email], pool);
-    if (resp.rows.length > 0) {
-      console.log('[DEBUG]: Hashing password');
-      const isValid = await bcrypt.compare(password, resp.rows[0][2]);
+    if (resp) {
+      const isValid = await bcrypt.compare(password, resp.rows[0].dhash);
       if (isValid) {
         console.log('[DEBUG]: User retrieved successfully');
         return;
@@ -194,7 +272,6 @@ async function loginUser(email, password, pool) {
 
 async function newQuery(query, values, pool) {
   var result = await pool.query({
-      rowMode: 'array',
       text: query,
       values
   });
