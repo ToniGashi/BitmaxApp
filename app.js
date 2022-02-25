@@ -3,12 +3,20 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
+const cors = require("cors");
 const { authenticateJWT } = require('./middleware/authJWT')
 const { dbConnector } = require('./middleware/dbConnect');
 const cookieParser = require('cookie-parser');
 const port = 3000;
 const app = express();
 
+const corsOptions = {
+  origin:'*', 
+  credentials:true,
+  optionSuccessStatus:200,
+}
+
+app.use(cors(corsOptions))
 app.use(bodyParser.json());
 app.use(express.json())
 app.use(dbConnector);
