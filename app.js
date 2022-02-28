@@ -1,5 +1,6 @@
 require('dotenv').config()
 const express = require('express');
+const http = require('http');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v1: uuidv1 } = require('uuid');
@@ -22,34 +23,46 @@ const corsOptions = {
 app.use(cors(corsOptions))
 app.use(bodyParser.json());
 app.use(express.json())
-app.use(dbConnector);
 app.use(cookieParser());
 const WebSocket = require('ws');
+const server = http.createServer(app);
+const io = require('socket.io')(server, {
+  cors: { origin: '*' },
+  pingInterval: 2000,
+  pingTimeout: 5000
+})
+server.listen(3005, () => { console.log('IO socket listening to port 3005!');});
 const wss = new WebSocket('wss://www.bitmex.com/realtime?subscribe=instrument:XBTUSD,instrument:ETHUSD,instrument:LTCUSD');
 
 wss.on('open', function () {
   wss.send('Connectiong to Bitmex');
 })
 
-wss.on("message", async function (message) {
-  const JSONMessage = JSON.parse(message);
-  if(JSONMessage?.data?.[0]?.symbol && JSONMessage?.data?.[0]?.rootSymbol && JSONMessage?.data?.[0]?.fairPrice) { // This only happens on the first time they send a message so this is when we will add them to database. For that we need name, symbol and price
-    try {
-      console.log(JSONMessage.data[0].fairPrice, JSONMessage.data[0].symbol, JSONMessage.data[0].rootSymbol)
-      await createTicker(JSONMessage.data[0].fairPrice, JSONMessage.data[0].rootSymbol, JSONMessage.data[0].symbol);
-    } catch (err) {
-      console.log('[SOCKET ERROR]: ', err);
+io.on('connection', (message) => {
+  console.log('=> USER HAS CONNECTED <=');
+  wss.on("message", async function (message) {
+    const JSONMessage = JSON.parse(message);
+    if(JSONMessage?.data?.[0]?.symbol && JSONMessage?.data?.[0]?.rootSymbol && JSONMessage?.data?.[0]?.fairPrice) { // This only happens on the first time they send a message so this is when we will add them to database. For that we need name, symbol and price
+      try {
+        await createTicker(JSONMessage.data[0].fairPrice, JSONMessage.data[0].rootSymbol, JSONMessage.data[0].symbol);
+        io.emit('message', await getTicker());
+      } catch (err) {
+        console.log('[SOCKET ERROR]: ', err);
+      }
     }
-  }
-  if(JSONMessage?.data?.[0]?.fairPrice) { // Once we see a change in fair price which is the variable I am using for the price, we update the database. Now the database will always have live data.
-    try{
-      const tickerByName = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id WHERE t.name=$1 LIMIT 1`, [JSONMessage.data[0].symbol]);
-      updateTicker(tickerByName[0].id, tickerByName[0].symbol, tickerByName[0].name, JSONMessage.data[0].fairPrice)
-    } catch (err) {
-      console.log('[SOCKET ERROR]: ', err);
+    if(JSONMessage?.data?.[0]?.fairPrice) { // Once we see a change in fair price which is the variable I am using for the price, we update the database. Now the database will always have live data.
+      try{
+        const tickerByName = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id WHERE t.name=$1 LIMIT 1`, [JSONMessage.data[0].symbol]);
+        if(tickerByName && tickerByName.price !==JSONMessage.data[0].fairPrice) {
+          updateTicker(tickerByName[0].id, tickerByName[0].symbol, tickerByName[0].name, JSONMessage.data[0].fairPrice)
+          io.emit('message', await getTicker());
+        }
+      } catch (err) {
+        console.log('[SOCKET ERROR]: ', err);
+      }
     }
-  }
-});
+  });
+})
 
 app.use(bodyParser.json());
 app.use(express.json())
@@ -275,7 +288,7 @@ async function loginUser(email, password) {
   try {
     const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email]);
     if (resp) {
-      const isValid = await bcrypt.compare(password, resp.rows[0].dhash);
+      const isValid = await bcrypt.compare(password, resp[0].dhash);
       if (isValid) {
         console.log('[DEBUG]: User retrieved successfully');
         return;
@@ -297,5 +310,5 @@ async function newQuery(query, values) {
       text: query,
       values
   });
-  return result;
+  return result.rows;
 }

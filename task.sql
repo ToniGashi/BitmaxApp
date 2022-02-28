@@ -10,7 +10,7 @@ CREATE TABLE users (
 CREATE TABLE tickers (
     id TEXT PRIMARY KEY NOT NULL,
     symbol VARCHAR(255),
-    name UNIQUE VARCHAR(255)
+    name text UNIQUE
 );
 
 CREATE TABLE user_tickers (

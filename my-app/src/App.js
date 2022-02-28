@@ -2,6 +2,7 @@ import { useState, useEffect, forwardRef  } from "react";
 import MaterialTable from "material-table";
 import tableIcons from "./MaterialTableIcons";
 import './App.css';
+const { io } = require("socket.io-client");
 
 const axiosLib = require('axios');
 
@@ -20,11 +21,21 @@ function notify(notification) {
     notify.classList.toggle("active");
   },2000)
 }
+
 function App() {
   const [email, setName] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [tickers, setTickers] = useState([]);
+  const [socket, setSocket] = useState(null);
+
+  useEffect(() => {
+    if(socket) {
+      socket.on('message', async (message) => {
+        setTickers(await fetchData());
+      })
+    }
+  }, [socket])
 
   useEffect(() => {
   }, [tickers]);
@@ -42,6 +53,11 @@ function App() {
   }
   
   async function loginUser() {
+    const newSocket = io("http://localhost:3005", {
+      pingInterval: 200000,
+      pingTimeout: 100000
+    });
+    setSocket(newSocket);
     try {
       await axios.post('/login', {
         email, 
@@ -107,8 +123,8 @@ function App() {
 
   async function fetchData() {
     const result = await axios.get('/ticker');
-    setTickers([result.data.message.rows]);
-    return result.data.message.rows;
+    setTickers([result.data.message]);
+    return result.data.message;
   }
 
   var columns = [
@@ -123,9 +139,9 @@ function App() {
         !isLoggedIn?
           <div className="form">
             <div class="notify"><span id="notifyType" class=""></span></div>
-            <h1>Sign in</h1>
+            <h1 style={{textAlign:'center'}}>Sign in</h1>
             <input type="text" id="email" value={email} onChange={(e) => setName(e.target.value)} placeholder="Email"></input><br></br>
-            <input type="text" id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
+            <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
             <button onClick={loginUser}>Log In</button>
           </div>
         :
