@@ -158,15 +158,16 @@ async function createUser(email, password, pool) {
 
 async function loginUser(email, password, pool) {
   console.log('=> STARTED LOGIN USER <=');
-  
+  try {
   validateEmail(email);
   console.log('[DEBUG]: Email validated');
-
   validatePassword(password);
   console.log('[DEBUG]: Password validated');
+  } catch (err) {
+    throw error;
+  }
 
   console.log('[DEBUG]: Connecting to database');
-
   await pool.connect();
 
   console.log('[DEBUG]: Sending the request to database');
