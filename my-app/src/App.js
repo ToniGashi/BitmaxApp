@@ -28,8 +28,13 @@ function App() {
         email, 
         password
       })
+      const notifyType = document.getElementById('response');
+      notifyType.innerHTML = '';
       notify('success');
     } catch (err) {
+      console.log(err.response);
+      const notifyType = document.getElementById('response');
+      notifyType.innerHTML = err.response.data.message || err.response.data.error.message;
       notify('failure');
       console.log(err);
     }
@@ -41,8 +46,12 @@ function App() {
         email, 
         password
       })
+      const notifyType = document.getElementById('response');
+      notifyType.innerHTML = '';
       notify('success');
     } catch (err) {
+      const notifyType = document.getElementById('response');
+      notifyType.innerHTML = err.response.data.error.message;
       notify('failure');
       console.log(err);
     }
@@ -54,7 +63,7 @@ function App() {
       <h1>Sign in</h1>
       <input type="text" id="email" value={email} onChange={(e) => setName(e.target.value)} placeholder="Email"></input><br></br>
       <input type="text" id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
-      <pre id='response' style={{color: 'red'}}></pre>
+      <pre id='response' class="error-message"></pre>
       <button onClick={createUser}>Create User</button>
       <button onClick={loginUser}>Log In</button>
     </div>

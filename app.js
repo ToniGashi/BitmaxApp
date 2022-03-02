@@ -11,7 +11,7 @@ const port = 3000;
 const app = express();
 
 const corsOptions = {
-  origin:'*', 
+  origin:'http://localhost:3001', 
   credentials:true,
   optionSuccessStatus:200,
 }
@@ -129,12 +129,14 @@ function validatePassword(pass) {
 
 async function createUser(email, password, pool) {
   console.log('=> STARTED CREATE USER <=');
-
-  validateEmail(email);
-  console.log('[DEBUG]: Email validated');
-
-  validatePassword(password);
-  console.log('[DEBUG]: Password validated');
+  try {
+    validateEmail(email);
+    console.log('[DEBUG]: Email validated');
+    validatePassword(password);
+    console.log('[DEBUG]: Password validated');
+  } catch (error) {
+    throw error;
+  }
 
   console.log('[DEBUG]: Connecting to database');
   await pool.connect();
@@ -149,7 +151,7 @@ async function createUser(email, password, pool) {
     return;
   } catch (err) {
     const error =  new Error('Email already exists')
-    error.statusCode = 400
+    error.statusCode = 409
     throw error;
   }
 }

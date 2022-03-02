@@ -54,6 +54,13 @@ button {
   padding: 50px 35px;
 }
 
+.error-message {
+  color: #c11d00;
+  background-color: #c23b1928;
+  text-align: center;
+  font-weight: bold;
+}
+
 #success{
   background:#03a679;
   color:#f0f0f0;  
