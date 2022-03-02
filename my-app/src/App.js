@@ -1,15 +1,9 @@
-<<<<<<< HEAD
-
-import './App.css';
-import { useState } from "react";
-=======
 import { useState, useEffect, forwardRef  } from "react";
 import MaterialTable from "material-table";
 import tableIcons from "./MaterialTableIcons";
 import { alpha } from '@material-ui/core/styles';
 import './App.css';
 
->>>>>>> c9c0931 (Fixing CSS, CORS, adding functionality to notify and fixing all the comments in the PR)
 const axiosLib = require('axios');
 
 const axios = axiosLib.create({

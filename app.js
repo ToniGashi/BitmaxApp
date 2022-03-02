@@ -253,7 +253,10 @@ async function loginUser(email, password, pool) {
   try {
     const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email], pool);
     if (resp) {
-      const isValid = await bcrypt.compare(password, resp.rows[0].dhash);
+      let isValid;
+      if(resp.rows?.[0]?.dhash) {
+        isValid = await bcrypt.compare(password, resp.rows[0].dhash);
+      }
       if (isValid) {
         console.log('[DEBUG]: User retrieved successfully');
         return;
