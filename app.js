@@ -127,11 +127,8 @@ async function createTicker(date, price, symbol, name, pool) {
   try {
     await newQuery(`INSERT INTO tickers (id, symbol, name) VALUES ($1, $2, $3)`, [id, symbol, name], pool);
     await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price], pool);
-    console.log('[DEBUG]: User created successfully');
-    return res.send({
-      status: 200,
-      message: 'Ticker created successfully'
-    });
+    console.log('[DEBUG]: User Ticker successfully');
+    return;
   } catch (err) {
     const error =  new Error(err.message)
     error.statusCode = 400
@@ -240,15 +237,12 @@ async function loginUser(email, password, pool) {
   validatePassword(password);
   console.log('[DEBUG]: Password validated');
   } catch (err) {
-    throw error;
+    throw err;
   }
 
-<<<<<<< HEAD
   console.log('[DEBUG]: Connecting to database');
   await pool.connect();
 
-=======
->>>>>>> d89d018 (Fixing CSS, CORS, adding functionality to notify and fixing all the comments in the PR)
   console.log('[DEBUG]: Sending the request to database');
   try {
     const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email], pool);
