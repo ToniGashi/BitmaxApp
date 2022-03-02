@@ -3,12 +3,20 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
+const cors = require("cors");
 const { authenticateJWT } = require('./middleware/authJWT')
 const { dbConnector } = require('./middleware/dbConnect');
 const cookieParser = require('cookie-parser');
 const port = 3000;
 const app = express();
 
+const corsOptions = {
+  origin:'http://localhost:3001', 
+  credentials:true,
+  optionSuccessStatus:200,
+}
+
+app.use(cors(corsOptions))
 app.use(bodyParser.json());
 app.use(express.json())
 app.use(dbConnector);
@@ -44,7 +52,7 @@ app.post('/login', async function(req, res) {
     await loginUser(email, password, req.pool)
     const accessToken = jwt.sign({ username: email }, process.env.JWT_SECRET_TOKEN);
     console.log('[DEBUG]: Access token generated');
-    res.cookie('accessToken', accessToken, { maxAge: 900000, httpOnly: true });
+    res.cookie('accessToken', accessToken, { maxAge: 900000 });
     return res.send({
       status: 200,
       message: 'User login successfully'
@@ -121,12 +129,14 @@ function validatePassword(pass) {
 
 async function createUser(email, password, pool) {
   console.log('=> STARTED CREATE USER <=');
-
-  validateEmail(email);
-  console.log('[DEBUG]: Email validated');
-
-  validatePassword(password);
-  console.log('[DEBUG]: Password validated');
+  try {
+    validateEmail(email);
+    console.log('[DEBUG]: Email validated');
+    validatePassword(password);
+    console.log('[DEBUG]: Password validated');
+  } catch (error) {
+    throw error;
+  }
 
   console.log('[DEBUG]: Connecting to database');
   await pool.connect();
@@ -141,19 +151,21 @@ async function createUser(email, password, pool) {
     return;
   } catch (err) {
     const error =  new Error('Email already exists')
-    error.statusCode = 400
+    error.statusCode = 409
     throw error;
   }
 }
 
 async function loginUser(email, password, pool) {
   console.log('=> STARTED LOGIN USER <=');
-  
+  try {
   validateEmail(email);
   console.log('[DEBUG]: Email validated');
-
   validatePassword(password);
   console.log('[DEBUG]: Password validated');
+  } catch (err) {
+    throw error;
+  }
 
   console.log('[DEBUG]: Connecting to database');
   await pool.connect();
