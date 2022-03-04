@@ -1,4 +1,5 @@
 openapi: 3.0.0
+
 info:
   title: Sciant Task API
   description: An API that allows Login and creation of a user.
@@ -7,6 +8,8 @@ info:
 paths:
   /user:
     post:
+      security:
+        - cookieAuth: []
       summary: Create User
       description: 'Create a user once logged in'
       requestBody:
@@ -57,6 +60,8 @@ paths:
           description: Not Found
   /ticker:
     get:
+      security:
+        - cookieAuth: []
       summary: Get tickers
       description: 'Get all the tickers inside the database'
       responses:
@@ -74,6 +79,8 @@ paths:
         403:
           description: Forbidden
     post:
+      security:
+        - cookieAuth: []
       summary: Create a ticker
       description: 'Create a ticker'
       requestBody:
@@ -97,6 +104,8 @@ paths:
         403:
           description: Forbidden
     put:
+      security:
+        - cookieAuth: []
       summary: Update a ticker
       description: 'Update a ticker'
       requestBody:
@@ -120,6 +129,8 @@ paths:
         403:
           description: Forbidden
     delete:
+      security:
+        - cookieAuth: []
       summary: Delete a ticker
       description: 'Delete a ticker'
       # requestBody:
@@ -140,6 +151,11 @@ paths:
           description: Forbidden
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
   schemas:
     UserRequestSchema:
       type: object

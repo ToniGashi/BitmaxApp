@@ -12,22 +12,27 @@ const axios = axiosLib.create({
   withCredentials: true
 });
 
-function notify(notification) {
+const notify = (notification) => {
   const notify = document.getElementsByClassName('notify')[0];
   notify.classList.toggle("active");
   const notifyType = document.getElementById('notifyType');
   notifyType.classList.toggle(notification);
-  setTimeout(function(){
+  setTimeout(() => {
     notifyType.classList.toggle(notification);
     notify.classList.toggle("active");
   },2000)
 }
-function App() {
+const App = () => {
   const [email, setName] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [tickers, setTickers] = useState([]);
   const [cookies, setCookies] = useCookies(['isLoggedIn']);
+  const [columns, setColumns] = useState([
+    {title: "symbol", field: "symbol"},
+    {title: "name", field: "name"},
+    {title: "price", field: "price", type:'numeric'}
+  ]);
 
   useEffect(() => {
   }, [tickers]);
@@ -83,10 +88,11 @@ function App() {
   const logOut = async() => {
     setIsLoggedIn(false);
     setCookies('isLoggedIn', 'no', { path: '/'});
+    setCookies('accessToken', '', { path: '/'});
     await clearForm('log');
   }
 
-  async function createTicker(newData) {
+  const createTicker = async (newData) => {
     const { price, name, symbol } = newData;
     try {
       await axios.post('/ticker', {
@@ -102,7 +108,7 @@ function App() {
     }
   }
 
-  async function updateTicker(oldData, newData) {
+  const updateTicker = async (oldData, newData) => {
     const { id:newId, price:newPrice, name:newName, symbol:newSymbol } = newData;
     try {
       await axios.put('/ticker', {
@@ -119,7 +125,7 @@ function App() {
     }
   }
   
-  async function deleteTicker(oldData) {
+  const deleteTicker = async (oldData) => {
     const { id } = oldData;
     try {
       await axios.delete('/ticker', {
@@ -135,7 +141,7 @@ function App() {
     }
   }
 
-  async function fetchData() {
+  const fetchData = async () => {
     const result = await axios.get('/ticker');
     setTickers([result.data.message.rows]);
     return result.data.message.rows;
@@ -150,29 +156,23 @@ function App() {
     }, 1)
   }
 
-  var columns = [
-    {title: "symbol", field: "symbol"},
-    {title: "name", field: "name"},
-    {title: "price", field: "price"}
-  ];
-
   return (
     <div>
       {
         cookies.isLoggedIn!=="yes"?
         <div className="logBody">
           <div className="form">
-            <div class="notify"><span id="notifyType" class=""></span></div>
+            <div className="notify"><span id="notifyType" className=""></span></div>
             <h1>Sign in</h1>
             <input type="text" id="logEmail" value={email} onChange={(e) => setName(e.target.value)} placeholder="Email"></input><br></br>
             <input type="password" id="logPassword" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
-            <pre id='response' class="error-message"></pre>
+            <pre id='response' className="error-message"></pre>
             <button onClick={loginUser}>Log In</button>
           </div>
         </div>
           
         :
-          <div class="container">
+          <div className="container">
             <div>
               <MaterialTable
                 title="Tickers"
@@ -212,14 +212,14 @@ function App() {
                 icons={tableIcons}
               />
             </div>
-            <div class='form2'>
-              <div class="notify"><span id="notifyType" class=""></span></div>
+            <div className='form2'>
+              <div className="notify"><span id="notifyType" className=""></span></div>
               <h1 style={{textAlign:'center'}}>Create User</h1>
               <div style={{width: '50%', margin: 'auto'}}>
                 <input type="text" id="createEmail" value={email} onChange={(e) => setName(e.target.value)} placeholder="Email"></input><br></br>
                 <input type="password" id="createPassword" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
               </div>
-              <pre id='createResponse' class="error-message"></pre>
+              <pre id='createResponse' className="error-message"></pre>
               <button onClick={createUser}>Create User</button>
               <button onClick={logOut}>Log Out</button>
             </div>

@@ -32,13 +32,14 @@ try {
 }
 
 app.get('/ticker', authenticateJWT, async function(req, res) {
-  console.log('=> STARTED GET TICKER <=');
+  console.log('=> STARTED GET TICKER<=');
   try{
+    const userId = jwt.verify(req.cookies['accessToken'], process.env.JWT_SECRET_TOKEN).id;
     console.log('[DEBUG]: Sending the request to database');
-    const resp = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id`, [], req.pool);
-    console.log("[DEBUG]: Ticker updated successfully");
+    const userTickers = await newQuery('SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1', [userId], req.pool);
+    console.log("[DEBUG]: Tickers retrieved successfully");
     res.send({
-      message: resp
+      message: userTickers
     })
   } catch (err) {
     console.log('[ERROR]: ', err.message);
@@ -56,10 +57,11 @@ app.put('/ticker', authenticateJWT, async function(req, res) {
       throw new Error('Data missing in request');
     }
     const date = new Date();
-    console.log('[DEBUG]: Sending the first request to ticker_data from database');
-    await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id], req.pool);
-    console.log('[DEBUG]: Sending the second request to tickers from database');
-    await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id], req.pool);
+    
+    await req.pool.query('BEGIN')
+      await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id], req.pool);
+      await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id], req.pool);
+    await req.pool.query('COMMIT')
 
     console.log("[DEBUG]: Ticker updated successfully");
     res.send({
@@ -77,12 +79,16 @@ app.put('/ticker', authenticateJWT, async function(req, res) {
 app.delete('/ticker', authenticateJWT, async function(req, res) {
   console.log('=> STARTED DELETE TICKER <=');
   try {
+    const userId = jwt.verify(req.cookies['accessToken'], process.env.JWT_SECRET_TOKEN).id;
     const { id } = req.body;
     if(!id) {
       throw new Error('ID not provided');
     }
-    await newQuery(`DELETE FROM ticker_data WHERE ticker_id=$1`, [id], req.pool);
-    await newQuery(`DELETE FROM tickers WHERE id=$1`, [id], req.pool);
+    await req.pool.query('BEGIN')
+      await newQuery(`DELETE FROM user_tickers WHERE user_id=$1 AND ticker_id=$2`, [userId, id], req.pool);
+      await newQuery(`DELETE FROM ticker_data WHERE ticker_id=$1`, [id], req.pool);
+      await newQuery(`DELETE FROM tickers WHERE id=$1`, [id], req.pool);
+    await req.pool.query('COMMIT')
     console.log("[DEBUG]: Ticker deleted successfully");
     res.status(200).send({
       status: 200,
@@ -99,12 +105,13 @@ app.delete('/ticker', authenticateJWT, async function(req, res) {
 app.post('/ticker', authenticateJWT, async function(req, res) {
   console.log('=> STARTED CREATE TICKER <=');
   try {
+    const userId = jwt.verify(req.cookies['accessToken'], process.env.JWT_SECRET_TOKEN).id;
     const { price, symbol, name } = req.body;
     if(!symbol || !name || !price) {
       throw new Error('Data missing in request');
     }
     const date = new Date();
-    await createTicker(date, price, symbol, name, req.pool);
+    await createTicker(date, price, symbol, name, req.pool, userId);
     console.log("[DEBUG]: Ticker created successfully");
     return res.send({
       status: 200,
@@ -118,15 +125,18 @@ app.post('/ticker', authenticateJWT, async function(req, res) {
   }
 })
 
-async function createTicker(date, price, symbol, name, pool) {
+async function createTicker(date, price, symbol, name, pool, userId) {
   console.log('=> STARTED CREATE TICKER <=');
 
   const id = uuidv1();
 
   console.log('[DEBUG]: Sending the request to database');
   try {
-    await newQuery(`INSERT INTO tickers (id, symbol, name) VALUES ($1, $2, $3)`, [id, symbol, name], pool);
-    await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price], pool);
+    await pool.query('BEGIN')
+      await newQuery(`INSERT INTO tickers (id, symbol, name) VALUES ($1, $2, $3)`, [id, symbol, name], pool);
+      await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price], pool);
+      await newQuery(`INSERT INTO user_tickers (user_id, ticker_id) VALUES ($1, $2)`, [userId, id], pool)
+    await pool.query('COMMIT')
     console.log('[DEBUG]: User Ticker successfully');
     return;
   } catch (err) {
@@ -155,8 +165,8 @@ app.post('/user', authenticateJWT, async function(req, res) {
 app.post('/login', async function(req, res) {
   try {
     const { email, password } = req.body;
-    await loginUser(email, password, req.pool)
-    const accessToken = jwt.sign({ username: email }, process.env.JWT_SECRET_TOKEN);
+    const resp = await loginUser(email, password, req.pool)
+    const accessToken = jwt.sign({ username: email, id: resp.rows[0].id }, process.env.JWT_SECRET_TOKEN);
     console.log('[DEBUG]: Access token generated');
     res.cookie('accessToken', accessToken, { maxAge: 900000 });
     return res.send({
@@ -219,10 +229,12 @@ async function createUser(email, password, pool) {
 
   console.log('[DEBUG]: Sending the request to database');
   try {
-    await newQuery(`INSERT INTO users (email, dhash) VALUES ($1, $2)`, [email, hash], pool);
+    const id = uuidv1();
+    await newQuery(`INSERT INTO users (id, email, dhash) VALUES ($1, $2, $3)`, [id, email, hash], pool);
     console.log('[DEBUG]: User created successfully');
     return;
   } catch (err) {
+    console.log('[ERROR]: ', err);
     const error =  new Error('Email already exists')
     error.statusCode = 409
     throw error;
@@ -253,7 +265,7 @@ async function loginUser(email, password, pool) {
       }
       if (isValid) {
         console.log('[DEBUG]: User retrieved successfully');
-        return;
+        return resp;
       } else {
         throw new Error('Wrong password');
       }
