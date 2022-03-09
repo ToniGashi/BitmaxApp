@@ -1,7 +1,6 @@
-import { useState, useEffect, forwardRef  } from "react";
-import MaterialTable from "material-table";
+import React, { useState, useRef } from "react";
+import MaterialTable from "@material-table/core";
 import tableIcons from "./MaterialTableIcons";
-import { alpha } from '@material-ui/core/styles';
 import { useCookies } from "react-cookie";
 import './App.css';
 
@@ -12,18 +11,8 @@ const axios = axiosLib.create({
   withCredentials: true
 });
 
-const notify = (notification) => {
-  const notify = document.getElementsByClassName('notify')[0];
-  notify.classList.toggle("active");
-  const notifyType = document.getElementById('notifyType');
-  notifyType.classList.toggle(notification);
-  setTimeout(() => {
-    notifyType.classList.toggle(notification);
-    notify.classList.toggle("active");
-  },2000)
-}
 const App = () => {
-  const [email, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [tickers, setTickers] = useState([]);
@@ -34,26 +23,40 @@ const App = () => {
     {title: "price", field: "price", type:'numeric'}
   ]);
 
-  useEffect(() => {
-  }, [tickers]);
+  const logEmail = useRef(null);
+  const logPassword = useRef(null);
+  const createEmail = useRef(null);
+  const createPassword = useRef(null);
+  const notifyContainer = useRef(null);
+  const notifyType = useRef(null);
+  const logError = useRef(null);
+  const createError = useRef(null);
 
+  const notify = (notification) => {
+    notifyContainer.current.classList.toggle('active')
+    notifyType.current.classList.toggle(notification);
+    setTimeout(() => {
+      notifyType.current.classList.toggle(notification);
+      notifyContainer.current.classList.toggle('active')
+    },2000)
+  }
+  
   const createUser = async() => {
+    const createErr = createError.current;
     try {
       const res = await axios.post('/user', {
         email, 
         password
       })
-      const notifyType = document.getElementById('createResponse');
-      if (notifyType) {
-        notifyType.innerHTML = '';
+      if (createErr) {
+        createErr.innerHTML = '';
       }
       notify('success');
-      await clearForm('create');
+      await clearForm();
     } catch (err) {
       console.log(err.response);
-      const notifyType = document.getElementById('createResponse');
-      if (notifyType) {
-        notifyType.innerHTML = err.response.data.message || err.response.data.error.message;
+      if (createErr) {
+        createErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
       notify('failure');
       console.log(err);
@@ -61,6 +64,7 @@ const App = () => {
   }
   
   const loginUser = async() => {
+    const logErr = logError.current;
     try {
       await axios.post('/login', {
         email, 
@@ -69,16 +73,15 @@ const App = () => {
       setIsLoggedIn(true);
       setTickers(await fetchData());
       setCookies('isLoggedIn', 'yes', { path: '/'});
-      const notifyType = document.getElementById('response');
-      if(notifyType) {
-        notifyType.innerHTML = '';
+      if(logErr) {
+        logErr.innerHTML = '';
       }
       notify('success');
-      await clearForm('create');
+      await clearForm();
     } catch (err) {
-      const notifyType = document.getElementById('response');
-      if (notifyType) {
-        notifyType.innerHTML = err.response.data.message || err.response.data.error.message;
+      console.log(err);
+      if (logErr) {
+        logErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
       notify('failure');
       console.log(err);
@@ -89,7 +92,7 @@ const App = () => {
     setIsLoggedIn(false);
     setCookies('isLoggedIn', 'no', { path: '/'});
     setCookies('accessToken', '', { path: '/'});
-    await clearForm('log');
+    await clearForm();
   }
 
   const createTicker = async (newData) => {
@@ -106,6 +109,7 @@ const App = () => {
       console.log(err.message);
       notify('failure');
     }
+    clearForm()
   }
 
   const updateTicker = async (oldData, newData) => {
@@ -123,6 +127,7 @@ const App = () => {
       console.log(err.message);
       notify('failure');
     }
+    clearForm()
   }
   
   const deleteTicker = async (oldData) => {
@@ -139,34 +144,30 @@ const App = () => {
       console.log(err.message);
       notify('failure');
     }
+    clearForm()
   }
 
   const fetchData = async () => {
     const result = await axios.get('/ticker');
-    setTickers([result.data.message.rows]);
     return result.data.message.rows;
   }
 
-  const clearForm = async (formType) => {
-    setTimeout(() => {
-    const emailInput = document.getElementById(`${formType}Email`);
-    emailInput.value='';
-    const passwordInput = document.getElementById(`${formType}Password`);
-    passwordInput.value='';
-    }, 1)
+  const clearForm = async () => {
+    setEmail('');
+    setPassword('');
   }
 
   return (
     <div>
+      <div ref={notifyContainer} className="notify"><span ref={notifyType} className=""></span></div>
       {
         cookies.isLoggedIn!=="yes"?
         <div className="logBody">
           <div className="form">
-            <div className="notify"><span id="notifyType" className=""></span></div>
             <h1>Sign in</h1>
-            <input type="text" id="logEmail" value={email} onChange={(e) => setName(e.target.value)} placeholder="Email"></input><br></br>
-            <input type="password" id="logPassword" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
-            <pre id='response' className="error-message"></pre>
+            <input type="text" ref={logEmail} value={email} autoComplete="off" onChange={(e) => setEmail(e.target.value)} placeholder="Email"></input><br></br>
+            <input type="password" ref={logPassword} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
+            <pre ref={logError} className="error-message"></pre>
             <button onClick={loginUser}>Log In</button>
           </div>
         </div>
@@ -210,16 +211,20 @@ const App = () => {
                 columns={columns}
                 data={tickers}
                 icons={tableIcons}
+                options={{
+                  search:false,
+                  showFirstLastPageButtons:false,
+                  showPreviousNextPageButtons:false,
+                }}
               />
             </div>
             <div className='form2'>
-              <div className="notify"><span id="notifyType" className=""></span></div>
               <h1 style={{textAlign:'center'}}>Create User</h1>
               <div style={{width: '50%', margin: 'auto'}}>
-                <input type="text" id="createEmail" value={email} onChange={(e) => setName(e.target.value)} placeholder="Email"></input><br></br>
-                <input type="password" id="createPassword" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
+                <input type="text" ref={createEmail} autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"></input><br></br>
+                <input type="password" ref={createPassword} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"></input><br></br>
               </div>
-              <pre id='createResponse' className="error-message"></pre>
+              <pre ref={createError} className="error-message"></pre>
               <button onClick={createUser}>Create User</button>
               <button onClick={logOut}>Log Out</button>
             </div>
