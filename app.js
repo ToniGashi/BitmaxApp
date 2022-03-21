@@ -18,6 +18,7 @@ const corsOptions = {
   credentials:true,
   optionSuccessStatus:200,
 }
+const pool = dbConnector();
 
 app.use(cors(corsOptions))
 app.use(bodyParser.json());
@@ -78,7 +79,7 @@ app.get('/ticker', authenticateJWT, async function(req, res) {
   try{
     const userId = jwt.verify(req.cookies['accessToken'], process.env.JWT_SECRET_TOKEN).id;
     console.log('[DEBUG]: Sending the request to database');
-    const userTickers = await newQuery('SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1', [userId], req.pool);
+    const userTickers = await newQuery('SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1', [userId]);
     console.log("[DEBUG]: Tickers retrieved successfully");
     res.send({
       message: userTickers
@@ -100,10 +101,10 @@ app.put('/ticker', authenticateJWT, async function(req, res) {
     }
     const date = new Date();
     
-    await req.pool.query('BEGIN')
-      await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id], req.pool);
-      await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id], req.pool);
-    await req.pool.query('COMMIT')
+    await pool.query('BEGIN')
+      await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id]);
+      await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id]);
+    await pool.query('COMMIT')
 
     console.log("[DEBUG]: Ticker updated successfully");
     res.send({
@@ -126,11 +127,11 @@ app.delete('/ticker', authenticateJWT, async function(req, res) {
     if(!id) {
       throw new Error('ID not provided');
     }
-    await req.pool.query('BEGIN')
-      await newQuery(`DELETE FROM user_tickers WHERE user_id=$1 AND ticker_id=$2`, [userId, id], req.pool);
-      await newQuery(`DELETE FROM ticker_data WHERE ticker_id=$1`, [id], req.pool);
-      await newQuery(`DELETE FROM tickers WHERE id=$1`, [id], req.pool);
-    await req.pool.query('COMMIT')
+    await pool.query('BEGIN')
+      await newQuery(`DELETE FROM user_tickers WHERE user_id=$1 AND ticker_id=$2`, [userId, id]);
+      await newQuery(`DELETE FROM ticker_data WHERE ticker_id=$1`, [id]);
+      await newQuery(`DELETE FROM tickers WHERE id=$1`, [id]);
+    await pool.query('COMMIT')
     console.log("[DEBUG]: Ticker deleted successfully");
     res.status(200).send({
       status: 200,
@@ -153,7 +154,7 @@ app.post('/ticker', authenticateJWT, async function(req, res) {
       throw new Error('Data missing in request');
     }
     const date = new Date();
-    await createTicker(date, price, symbol, name, req.pool, userId);
+    await createTicker(date, price, symbol, name, userId);
     console.log("[DEBUG]: Ticker created successfully");
     return res.send({
       status: 200,
@@ -167,7 +168,7 @@ app.post('/ticker', authenticateJWT, async function(req, res) {
   }
 })
 
-async function createTicker(date, price, symbol, name, pool, userId) {
+async function createTicker(date, price, symbol, name, userId) {
   console.log('=> STARTED CREATE TICKER <=');
 
   const id = uuidv1();
@@ -175,9 +176,9 @@ async function createTicker(date, price, symbol, name, pool, userId) {
   console.log('[DEBUG]: Sending the request to database');
   try {
     await pool.query('BEGIN')
-      await newQuery(`INSERT INTO tickers (id, symbol, name) VALUES ($1, $2, $3)`, [id, symbol, name], pool);
-      await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price], pool);
-      await newQuery(`INSERT INTO user_tickers (user_id, ticker_id) VALUES ($1, $2)`, [userId, id], pool)
+      await newQuery(`INSERT INTO tickers (id, symbol, name) VALUES ($1, $2, $3)`, [id, symbol, name]);
+      await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price]);
+      await newQuery(`INSERT INTO user_tickers (user_id, ticker_id) VALUES ($1, $2)`, [userId, id])
     await pool.query('COMMIT')
     console.log('[DEBUG]: User Ticker successfully');
     return;
@@ -191,7 +192,7 @@ async function createTicker(date, price, symbol, name, pool, userId) {
 app.post('/user', authenticateJWT, async function(req, res) {
   try {
     const { email, password } = req.body;
-    await createUser(email, password, req.pool);
+    await createUser(email, password);
     return res.send({
       status: 200,
       message: 'User created successfully'
@@ -207,7 +208,7 @@ app.post('/user', authenticateJWT, async function(req, res) {
 app.post('/login', async function(req, res) {
   try {
     const { email, password } = req.body;
-    const resp = await loginUser(email, password, req.pool)
+    const resp = await loginUser(email, password)
     const accessToken = jwt.sign({ username: email, id: resp.rows[0].id }, process.env.JWT_SECRET_TOKEN);
     console.log('[DEBUG]: Access token generated');
     res.cookie('accessToken', accessToken, { maxAge: 900000 });
@@ -255,7 +256,7 @@ function validatePassword(pass) {
   }
 }
 
-async function createUser(email, password, pool) {
+async function createUser(email, password) {
   console.log('=> STARTED CREATE USER <=');
   try {
     validateEmail(email);
@@ -272,7 +273,7 @@ async function createUser(email, password, pool) {
   console.log('[DEBUG]: Sending the request to database');
   try {
     const id = uuidv1();
-    await newQuery(`INSERT INTO users (id, email, dhash) VALUES ($1, $2, $3)`, [id, email, hash], pool);
+    await newQuery(`INSERT INTO users (id, email, dhash) VALUES ($1, $2, $3)`, [id, email, hash]);
     console.log('[DEBUG]: User created successfully');
     return;
   } catch (err) {
@@ -283,7 +284,7 @@ async function createUser(email, password, pool) {
   }
 }
 
-async function loginUser(email, password, pool) {
+async function loginUser(email, password) {
   console.log('=> STARTED LOGIN USER <=');
   try {
   validateEmail(email);
@@ -299,7 +300,7 @@ async function loginUser(email, password, pool) {
 
   console.log('[DEBUG]: Sending the request to database');
   try {
-    const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email], pool);
+    const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email]);
     if (resp) {
       let isValid;
       if(resp.rows?.[0]?.dhash) {
@@ -321,7 +322,7 @@ async function loginUser(email, password, pool) {
   }
 }
 
-async function newQuery(query, values, pool) {
+async function newQuery(query, values) {
   var result = await pool.query({
       text: query,
       values

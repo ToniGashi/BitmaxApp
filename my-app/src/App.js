@@ -1,9 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import MaterialTable from "@material-table/core";
 import tableIcons from "./MaterialTableIcons";
 import { useCookies } from "react-cookie";
 import './App.css';
-const { io } = require("socket.io-client");
+import { io } from "socket.io-client";
 
 const axiosLib = require('axios');
 
@@ -15,7 +15,8 @@ const axios = axiosLib.create({
 function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [socket, setSocket] = useState(null);
   const [tickers, setTickers] = useState([]);
   const [cookies, setCookies] = useCookies(['isLoggedIn']);
   const [columns, setColumns] = useState([
