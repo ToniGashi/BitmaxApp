@@ -15,10 +15,11 @@ const pool = dbConnector();
 const app = express();
 
 const corsOptions = {
-  origin:'*', 
+  origin:'http://localhost:3001', 
   credentials:true,
   optionSuccessStatus:200,
 }
+let userId;
 
 app.use(cors(corsOptions))
 app.use(bodyParser.json());
@@ -31,30 +32,49 @@ const io = require('socket.io')(server, {
   pingInterval: 2000,
   pingTimeout: 5000
 })
-server.listen(3005, () => { console.log('IO socket listening to port 3005!');});
-const wss = new WebSocket('wss://www.bitmex.com/realtime?subscribe=instrument:XBTUSD,instrument:ETHUSD,instrument:LTCUSD');
-
-wss.on('open', function () {
-  wss.send('Connectiong to Bitmex');
-})
+server.listen(3007, () => { console.log('IO socket listening to port 3007!');});
 
 io.on('connection', (message) => {
+  const wss = new WebSocket('wss://www.bitmex.com/realtime?subscribe=instrument:XBTUSD,instrument:ETHUSD,instrument:LTCUSD');
+
+  message.on('disconnect', () => {
+    console.log('user disconnected');
+    wss.close();
+  })
+
+  message.on('logout', () => {
+    console.log('user logged out');
+    wss.close();
+  })
+
+  wss.on('open', function () {
+    wss.send('Connectiong to Bitmex');
+  })
   console.log('=> USER HAS CONNECTED <=');
   wss.on("message", async function (message) {
     const JSONMessage = JSON.parse(message);
     if(JSONMessage?.data?.[0]?.symbol && JSONMessage?.data?.[0]?.rootSymbol && JSONMessage?.data?.[0]?.fairPrice) { // This only happens on the first time they send a message so this is when we will add them to database. For that we need name, symbol and price
-      try {
-        await createTicker(JSONMessage.data[0].fairPrice, JSONMessage.data[0].rootSymbol, JSONMessage.data[0].symbol);
-        io.emit('message', await getTicker());
-      } catch (err) {
-        console.log('[SOCKET ERROR]: ', err);
+      
+      const tickerByName = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id WHERE t.name=$1 LIMIT 1`, [JSONMessage.data[0].symbol]);
+      if(!tickerByName)
+      {
+        try {
+          console.log('STARTING THE CREATION OF: ', [JSONMessage.data[0].symbol]);
+          await createTicker(JSONMessage.data[0].fairPrice, JSONMessage.data[0].rootSymbol, JSONMessage.data[0].symbol);
+          await io.emit('message', await getTicker());
+        } catch (err) {
+          console.log('[SOCKET ERROR]: ', err);
+        }
+      } else {
+        console.log('Ticker: ', tickerByName[0].name, ' already exists');
       }
     }
     if(JSONMessage?.data?.[0]?.fairPrice) { // Once we see a change in fair price which is the variable I am using for the price, we update the database. Now the database will always have live data.
       try{
+        console.log('STARTING THE UPDATE OF: ', [JSONMessage.data[0].symbol]);
         const tickerByName = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id WHERE t.name=$1 LIMIT 1`, [JSONMessage.data[0].symbol]);
-        if(tickerByName && tickerByName.price !==JSONMessage.data[0].fairPrice) {
-          updateTicker(tickerByName[0].id, tickerByName[0].symbol, tickerByName[0].name, JSONMessage.data[0].fairPrice)
+        if(tickerByName?.[0]?.id && tickerByName[0].price !== JSONMessage.data[0].fairPrice) {
+          await updateTicker(tickerByName[0].id, tickerByName[0].symbol, tickerByName[0].name, JSONMessage.data[0].fairPrice)
           io.emit('message', await getTicker());
         }
       } catch (err) {
@@ -150,13 +170,11 @@ app.delete('/ticker', authenticateJWT, async function(req, res) {
 app.post('/ticker', authenticateJWT, async function(req, res) {
   console.log('=> STARTED CREATE TICKER <=');
   try {
-    const userId = jwt.verify(req.cookies['accessToken'], process.env.JWT_SECRET_TOKEN).id;
     const { price, symbol, name } = req.body;
     if(!symbol || !name || !price) {
       throw new Error('Data missing in request');
     }
-    const date = new Date();
-    await createTicker(date, price, symbol, name, userId);
+    await createTicker(price, symbol, name);
     console.log("[DEBUG]: Ticker created successfully");
     return res.send({
       status: 200,
@@ -170,10 +188,12 @@ app.post('/ticker', authenticateJWT, async function(req, res) {
   }
 })
 
-async function createTicker(date, price, symbol, name, userId) {
+async function createTicker(price, symbol, name) {
   console.log('=> STARTED CREATE TICKER <=');
 
   const id = uuidv1();
+
+  const date = new Date();
 
   console.log('[DEBUG]: Sending the request to database');
   try {
@@ -182,7 +202,7 @@ async function createTicker(date, price, symbol, name, userId) {
       await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price]);
       await newQuery(`INSERT INTO user_tickers (user_id, ticker_id) VALUES ($1, $2)`, [userId, id])
     await pool.query('COMMIT')
-    console.log('[DEBUG]: User Ticker successfully');
+    console.log('[DEBUG]: Ticker created successfully');
     return;
   } catch (err) {
     const error =  new Error(err.message)
@@ -191,7 +211,7 @@ async function createTicker(date, price, symbol, name, userId) {
   }
 }
 
-app.post('/user', authenticateJWT, async function(req, res) {
+app.post('/user', async function(req, res) {
   try {
     const { email, password } = req.body;
     await createUser(email, password);
@@ -211,9 +231,10 @@ app.post('/login', async function(req, res) {
   try {
     const { email, password } = req.body;
     const resp = await loginUser(email, password)
-    const accessToken = jwt.sign({ username: email, id: resp.rows[0].id }, process.env.JWT_SECRET_TOKEN);
+    const accessToken = jwt.sign({ username: email, id: resp[0].id }, process.env.JWT_SECRET_TOKEN);
     console.log('[DEBUG]: Access token generated');
     res.cookie('accessToken', accessToken, { maxAge: 900000 });
+    userId = resp[0].id;
     return res.send({
       status: 200,
       message: 'User login successfully'
@@ -279,7 +300,6 @@ async function createUser(email, password) {
     console.log('[DEBUG]: User created successfully');
     return;
   } catch (err) {
-    console.log('[ERROR]: ', err);
     const error =  new Error('Email already exists')
     error.statusCode = 409
     throw error;
@@ -288,6 +308,7 @@ async function createUser(email, password) {
 
 async function loginUser(email, password) {
   console.log('=> STARTED LOGIN USER <=');
+  console.log([email, password]);
   try {
   validateEmail(email);
   console.log('[DEBUG]: Email validated');
@@ -305,8 +326,10 @@ async function loginUser(email, password) {
     const resp = await newQuery(`SELECT * FROM users WHERE email=$1`, [email]);
     if (resp) {
       let isValid;
-      if(resp.rows?.[0]?.dhash) {
-        isValid = await bcrypt.compare(password, resp.rows[0].dhash);
+      if(resp?.[0]?.dhash) {
+        isValid = await bcrypt.compare(password, resp[0].dhash);
+      } else {
+        throw new Error('Could not compare password to hash correctly');
       }
       if (isValid) {
         console.log('[DEBUG]: User retrieved successfully');

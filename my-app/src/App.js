@@ -41,6 +41,9 @@ function App() {
     }
   }, [socket])
 
+  useEffect(() => {
+  }, [tickers]);
+
   const notify = (notification) => {
     notifyContainer.current.classList.toggle('active')
     notifyType.current.classList.toggle(notification);
@@ -74,11 +77,6 @@ function App() {
   
   const loginUser = async() => {
     const logErr = logError.current;
-    const newSocket = io("http://localhost:3005", {
-      pingInterval: 200000,
-      pingTimeout: 100000
-    });
-    setSocket(newSocket);
     try {
       await axios.post('/login', {
         email, 
@@ -91,6 +89,8 @@ function App() {
         logErr.innerHTML = '';
       }
       notify('success');
+      const newSocket = io("http://localhost:3007");
+      setSocket(newSocket);
       await clearForm();
     } catch (err) {
       console.log(err);
@@ -104,6 +104,7 @@ function App() {
 
   const logOut = async() => {
     setIsLoggedIn(false);
+   socket.emit('logout');
     setCookies('isLoggedIn', 'no', { path: '/'});
     setCookies('accessToken', '', { path: '/'});
     await clearForm();
@@ -164,7 +165,7 @@ function App() {
   const fetchData = async () => {
     const result = await axios.get('/ticker');
     setTickers([result.data.message]);
-    return result.data.message.rows;
+    return result.data.message;
   }
 
   const clearForm = async () => {
