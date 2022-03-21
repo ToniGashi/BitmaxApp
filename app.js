@@ -11,14 +11,14 @@ const { dbConnector } = require('./middleware/dbConnect');
 const cookieParser = require('cookie-parser');
 const { checkRequirements } = require('./middleware/config');
 const port = 3000;
+const pool = dbConnector();
 const app = express();
 
 const corsOptions = {
-  origin:'http://localhost:3001', 
+  origin:'*', 
   credentials:true,
   optionSuccessStatus:200,
 }
-const pool = dbConnector();
 
 app.use(cors(corsOptions))
 app.use(bodyParser.json());
@@ -75,14 +75,12 @@ try {
 }
 
 app.get('/ticker', authenticateJWT, async function(req, res) {
-  console.log('=> STARTED GET TICKER<=');
+  console.log('=> STARTED GET TICKER <=');
   try{
-    const userId = jwt.verify(req.cookies['accessToken'], process.env.JWT_SECRET_TOKEN).id;
     console.log('[DEBUG]: Sending the request to database');
-    const userTickers = await newQuery('SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1', [userId]);
-    console.log("[DEBUG]: Tickers retrieved successfully");
+    const resp = await getTicker();
     res.send({
-      message: userTickers
+      message: resp
     })
   } catch (err) {
     console.log('[ERROR]: ', err.message);
@@ -92,21 +90,19 @@ app.get('/ticker', authenticateJWT, async function(req, res) {
   }
 })
 
-app.put('/ticker', authenticateJWT, async function(req, res) {
+async function getTicker() {
+  return newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id`, []);
+}
+
+app.put('/ticker', authenticateJWT, async function(req, res) { // Updates ticker by id
   console.log('=> STARTED UPDATE TICKER <=');
   try{
     const { id, symbol, name, price } = req.body;
     if(!id || !symbol || !name || !price) {
       throw new Error('Data missing in request');
     }
-    const date = new Date();
-    
-    await pool.query('BEGIN')
-      await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id]);
-      await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id]);
-    await pool.query('COMMIT')
-
-    console.log("[DEBUG]: Ticker updated successfully");
+    await updateTicker(id, symbol, name, price)
+    console.log("Ticker updated successfully");
     res.send({
       status: 200,
       message: "Ticker updated successfully"
@@ -119,10 +115,16 @@ app.put('/ticker', authenticateJWT, async function(req, res) {
   }
 })
 
+async function updateTicker(id, symbol, name, price){
+  const date = new Date();
+  await pool.query('BEGIN')
+    await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id]);
+    await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id]);
+  await pool.query('COMMIT')
+}
 app.delete('/ticker', authenticateJWT, async function(req, res) {
   console.log('=> STARTED DELETE TICKER <=');
   try {
-    const userId = jwt.verify(req.cookies['accessToken'], process.env.JWT_SECRET_TOKEN).id;
     const { id } = req.body;
     if(!id) {
       throw new Error('ID not provided');
