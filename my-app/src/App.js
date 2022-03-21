@@ -12,7 +12,7 @@ const axios = axiosLib.create({
   withCredentials: true
 });
 
-function App() {
+const App = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -40,10 +40,7 @@ function App() {
       })
     }
   }, [socket])
-
-  useEffect(() => {
-  }, [tickers]);
-
+  
   const notify = (notification) => {
     notifyContainer.current.classList.toggle('active')
     notifyType.current.classList.toggle(notification);
