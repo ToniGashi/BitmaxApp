@@ -29,6 +29,8 @@ const WebSocket = require('ws');
 const server = http.createServer(app);
 const io = require('socket.io')(server, {
   cors: { origin: '*' },
+  autoConnect: false,
+  reconnection: false,
   pingInterval: 2000,
   pingTimeout: 5000
 })
@@ -38,12 +40,7 @@ io.on('connection', (message) => {
   const wss = new WebSocket('wss://www.bitmex.com/realtime?subscribe=instrument:XBTUSD,instrument:ETHUSD,instrument:LTCUSD');
 
   message.on('disconnect', () => {
-    console.log('user disconnected');
-    wss.close();
-  })
-
-  message.on('logout', () => {
-    console.log('user logged out');
+    console.log('User disconnected');
     wss.close();
   })
 
@@ -111,7 +108,7 @@ app.get('/ticker', authenticateJWT, async function(req, res) {
 })
 
 async function getTicker() {
-  return newQuery(`SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1`, [userId]);
+  return newQuery(`SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1 OR t.name IN ('XBTUSD', 'ETHUSD', 'LTCUSD')`, [userId]);
 }
 
 app.put('/ticker', authenticateJWT, async function(req, res) { // Updates ticker by id

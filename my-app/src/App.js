@@ -101,7 +101,8 @@ const App = () => {
 
   const logOut = async() => {
     setIsLoggedIn(false);
-   socket.emit('logout');
+    await socket.disconnect();
+    setSocket(null);
     setCookies('isLoggedIn', 'no', { path: '/'});
     setCookies('accessToken', '', { path: '/'});
     await clearForm();
