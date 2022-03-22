@@ -111,7 +111,7 @@ app.get('/ticker', authenticateJWT, async function(req, res) {
 })
 
 async function getTicker() {
-  return newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id`, []);
+  return newQuery(`SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1`, [userId]);
 }
 
 app.put('/ticker', authenticateJWT, async function(req, res) { // Updates ticker by id
@@ -122,7 +122,7 @@ app.put('/ticker', authenticateJWT, async function(req, res) { // Updates ticker
       throw new Error('Data missing in request');
     }
     await updateTicker(id, symbol, name, price)
-    console.log("Ticker updated successfully");
+    console.log("[DEBUG]: Ticker updated successfully");
     res.send({
       status: 200,
       message: "Ticker updated successfully"
@@ -211,7 +211,7 @@ async function createTicker(price, symbol, name) {
   }
 }
 
-app.post('/user', async function(req, res) {
+app.post('/user', authenticateJWT, async function(req, res) {
   try {
     const { email, password } = req.body;
     await createUser(email, password);
