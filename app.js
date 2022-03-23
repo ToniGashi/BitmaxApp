@@ -41,6 +41,7 @@ io.on('connection', (message) => {
 
   message.on('disconnect', () => {
     console.log('User disconnected');
+    io.emit('disconnected', 'User dc');
     wss.close();
   })
 
@@ -50,22 +51,6 @@ io.on('connection', (message) => {
   console.log('=> USER HAS CONNECTED <=');
   wss.on("message", async function (message) {
     const JSONMessage = JSON.parse(message);
-    if(JSONMessage?.data?.[0]?.symbol && JSONMessage?.data?.[0]?.rootSymbol && JSONMessage?.data?.[0]?.fairPrice) { // This only happens on the first time they send a message so this is when we will add them to database. For that we need name, symbol and price
-      
-      const tickerByName = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id WHERE t.name=$1 LIMIT 1`, [JSONMessage.data[0].symbol]);
-      if(!tickerByName)
-      {
-        try {
-          console.log('STARTING THE CREATION OF: ', [JSONMessage.data[0].symbol]);
-          await createTicker(JSONMessage.data[0].fairPrice, JSONMessage.data[0].rootSymbol, JSONMessage.data[0].symbol);
-          await io.emit('message', await getTicker());
-        } catch (err) {
-          console.log('[SOCKET ERROR]: ', err);
-        }
-      } else {
-        console.log('Ticker: ', tickerByName[0].name, ' already exists');
-      }
-    }
     if(JSONMessage?.data?.[0]?.fairPrice) { // Once we see a change in fair price which is the variable I am using for the price, we update the database. Now the database will always have live data.
       try{
         console.log('STARTING THE UPDATE OF: ', [JSONMessage.data[0].symbol]);
@@ -91,6 +76,27 @@ try {
   return;
 }
 
+app.get('/tickerData', authenticateJWT, async function(req, res) {
+  console.log('=> STARTED GET TICKER DATA <=');
+  try{
+    const {tickerId} = req.query;
+    console.log('[DEBUG]: Sending the request to database');
+    const resp = await getTickerData(tickerId);
+    res.send({
+      message: resp
+    })
+  } catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+})
+
+async function getTickerData(tickerId) {
+  return newQuery(`SELECT * FROM ticker_data WHERE ticker_data.ticker_id=$1`, [tickerId]);
+}
+
 app.get('/ticker', authenticateJWT, async function(req, res) {
   console.log('=> STARTED GET TICKER <=');
   try{
@@ -108,7 +114,18 @@ app.get('/ticker', authenticateJWT, async function(req, res) {
 })
 
 async function getTicker() {
-  return newQuery(`SELECT t.id, t.name, t.symbol, td.price FROM user_tickers ut INNER JOIN tickers t ON ut.ticker_id = t.id INNER JOIN ticker_data td ON td.ticker_id=t.id INNER JOIN users u ON u.id=ut.user_id WHERE u.id=$1 OR t.name IN ('XBTUSD', 'ETHUSD', 'LTCUSD')`, [userId]);
+  return newQuery(
+    `SELECT DISTINCT ON (tickers.id)
+    tickers.*, td.price, td.Date
+    FROM tickers
+    INNER JOIN ticker_data td
+    ON td.ticker_id = tickers.id
+    LEFT JOIN user_tickers ut
+    ON ut.ticker_id = tickers.id
+    LEFT JOIN users u
+    ON u.id = ut.user_id
+    WHERE u.id=$1 OR tickers.name IN ('XBTUSD', 'ETHUSD', 'LTCUSD')
+    ORDER BY tickers.id, td.Date DESC`, [userId]);
 }
 
 app.put('/ticker', authenticateJWT, async function(req, res) { // Updates ticker by id
@@ -135,7 +152,7 @@ app.put('/ticker', authenticateJWT, async function(req, res) { // Updates ticker
 async function updateTicker(id, symbol, name, price){
   const date = new Date();
   await pool.query('BEGIN')
-    await newQuery(`UPDATE ticker_data SET Date=$1, price=$2 WHERE ticker_id=$3`, [date, price, id]);
+    await newQuery(`INSERT INTO ticker_data (Date,price,ticker_id) VALUES ($1,$2,$3)`, [date, price, id]);
     await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id]);
   await pool.query('COMMIT')
 }
@@ -148,7 +165,6 @@ app.delete('/ticker', authenticateJWT, async function(req, res) {
     }
     await pool.query('BEGIN')
       await newQuery(`DELETE FROM user_tickers WHERE user_id=$1 AND ticker_id=$2`, [userId, id]);
-      await newQuery(`DELETE FROM ticker_data WHERE ticker_id=$1`, [id]);
       await newQuery(`DELETE FROM tickers WHERE id=$1`, [id]);
     await pool.query('COMMIT')
     console.log("[DEBUG]: Ticker deleted successfully");
@@ -325,8 +341,6 @@ async function loginUser(email, password) {
       let isValid;
       if(resp?.[0]?.dhash) {
         isValid = await bcrypt.compare(password, resp[0].dhash);
-      } else {
-        throw new Error('Could not compare password to hash correctly');
       }
       if (isValid) {
         console.log('[DEBUG]: User retrieved successfully');

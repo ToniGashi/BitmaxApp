@@ -36,7 +36,12 @@ const App = () => {
   useEffect(() => {
     if(socket) {
       socket.on('message', async (message) => {
-        setTickers(await fetchData());
+        console.log(message);
+        setTickers(message);
+      })
+      socket.on('disconnected', async (message) => {
+        console.log(message);
+        logOut();
       })
     }
   }, [socket])
@@ -101,9 +106,9 @@ const App = () => {
 
   const logOut = async() => {
     setIsLoggedIn(false);
+    setCookies('isLoggedIn', 'no', { path: '/'});
     await socket.disconnect();
     setSocket(null);
-    setCookies('isLoggedIn', 'no', { path: '/'});
     setCookies('accessToken', '', { path: '/'});
     await clearForm();
   }
@@ -162,6 +167,7 @@ const App = () => {
 
   const fetchData = async () => {
     const result = await axios.get('/ticker');
+    console.log('FETCHING TICKERS: ', result);
     setTickers([result.data.message]);
     return result.data.message;
   }
@@ -192,8 +198,8 @@ const App = () => {
               <MaterialTable
                 title="Tickers"
                 editable={{
-                  isEditable: rowData => true,
-                  isDeletable: rowData => true,
+                  isEditable: rowData =>  rowData.symbol!=='XBT' && rowData.symbol!=='LTC' && rowData.symbol!=='ETH',
+                  isDeletable: rowData => rowData.symbol!=='XBT' && rowData.symbol!=='LTC' && rowData.symbol!=='ETH',
                   onRowAddCancelled: rowData => console.log('Row adding cancelled'),
                   onRowUpdateCancelled: rowData => console.log('Row editing cancelled'),
                   onRowDeleteCancelled: rowData => console.log('Row deliting cancelled'),
