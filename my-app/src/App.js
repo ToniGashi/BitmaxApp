@@ -167,7 +167,6 @@ const App = () => {
 
   const fetchData = async () => {
     const result = await axios.get('/ticker');
-    console.log('FETCHING TICKERS: ', result);
     setTickers([result.data.message]);
     return result.data.message;
   }
