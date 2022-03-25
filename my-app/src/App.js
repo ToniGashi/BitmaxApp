@@ -4,6 +4,7 @@ import tableIcons from "./MaterialTableIcons";
 import { useCookies } from "react-cookie";
 import './App.css';
 import { io } from "socket.io-client";
+import jwt_decode from "jwt-decode";
 
 const axiosLib = require('axios');
 
@@ -45,7 +46,14 @@ const App = () => {
       })
     }
   }, [socket])
-  
+
+  useEffect(() => {
+    window.addEventListener("beforeunload", logOut);
+    return () => {
+      window.removeEventListener("beforeunload", logOut);
+    };
+  }, []);
+
   const notify = (notification) => {
     notifyContainer.current.classList.toggle('active')
     notifyType.current.classList.toggle(notification);
@@ -58,7 +66,7 @@ const App = () => {
   const createUser = async() => {
     const createErr = createError.current;
     try {
-      const res = await axios.post('/user', {
+      const res = await axios.post('/user-management/user', {
         email, 
         password
       })
@@ -80,10 +88,11 @@ const App = () => {
   const loginUser = async() => {
     const logErr = logError.current;
     try {
-      await axios.post('/login', {
+      const resp = await axios.post('/user-management/login', {
         email, 
         password
       })
+      console.log(resp);
       setIsLoggedIn(true);
       setTickers(await fetchData());
       setCookies('isLoggedIn', 'yes', { path: '/'});
@@ -93,30 +102,30 @@ const App = () => {
       notify('success');
       const newSocket = io("http://localhost:3007");
       setSocket(newSocket);
+      newSocket.emit('userId', jwt_decode(resp.data.accessToken).id)
       await clearForm();
     } catch (err) {
       console.log(err);
-      if (logErr) {
+      if (logErr && (err.response?.data?.message || err.response?.data?.error?.message)) {
         logErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
       notify('failure');
-      console.log(err);
     }
   }
 
   const logOut = async() => {
     setIsLoggedIn(false);
     setCookies('isLoggedIn', 'no', { path: '/'});
+    setCookies('accessToken', '', { path: '/'});
     await socket.disconnect();
     setSocket(null);
-    setCookies('accessToken', '', { path: '/'});
     await clearForm();
   }
 
   const createTicker = async (newData) => {
     const { price, name, symbol } = newData;
     try {
-      await axios.post('/ticker', {
+      await axios.post('/ticker-management/tickers', {
         price, 
         symbol,
         name
@@ -133,7 +142,7 @@ const App = () => {
   const updateTicker = async (oldData, newData) => {
     const { id:newId, price:newPrice, name:newName, symbol:newSymbol } = newData;
     try {
-      await axios.put('/ticker', {
+      await axios.put('/ticker-management/tickers', {
         id:newId, 
         price: newPrice,
         name: newName,
@@ -151,7 +160,7 @@ const App = () => {
   const deleteTicker = async (oldData) => {
     const { id } = oldData;
     try {
-      await axios.delete('/ticker', {
+      await axios.delete('/ticker-management/tickers', {
         data: {
           id: id
         }
@@ -166,8 +175,13 @@ const App = () => {
   }
 
   const fetchData = async () => {
-    const result = await axios.get('/ticker');
-    setTickers([result.data.message]);
+    let result;
+    try {
+      result = await axios.get('/ticker-management/tickers');
+    } catch (err) {
+      console.log(err);
+      throw new Error('Error fetching ticker data');
+    }
     return result.data.message;
   }
 
