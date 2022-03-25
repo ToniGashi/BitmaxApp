@@ -7,19 +7,17 @@ const tickerController = {
   async getTickerData(tickerId) {
     return newQuery(`SELECT * FROM ticker_data WHERE ticker_data.ticker_id=$1`, [tickerId]);
   },
-  async getTicker(userId) {
+  async getTicker() {
     return newQuery(
       `SELECT DISTINCT ON (tickers.id)
-      tickers.*, td.price, td.Date
+      tickers.*, td.price, td.Date, u.id as user_id
       FROM tickers
       INNER JOIN ticker_data td
       ON td.ticker_id = tickers.id
       LEFT JOIN user_tickers ut
       ON ut.ticker_id = tickers.id
       LEFT JOIN users u
-      ON u.id = ut.user_id
-      WHERE u.id=$1 OR tickers.name IN ('XBTUSD', 'ETHUSD', 'LTCUSD')
-      ORDER BY tickers.id, td.Date DESC`, [userId]);
+      ON u.id = ut.user_id`);
   },
   async updateTicker(id, symbol, name, price){
     const date = new Date();
@@ -29,20 +27,16 @@ const tickerController = {
     await pool.query('COMMIT')
   },
   async createTicker(price, symbol, name, userId) {
-    console.log('=> STARTED CREATE TICKER <=');
-  
     const id = uuidv1();
   
     const date = new Date();
   
-    console.log('[DEBUG]: Sending the request to database');
     try {
       await pool.query('BEGIN')
         await newQuery(`INSERT INTO tickers (id, symbol, name) VALUES ($1, $2, $3)`, [id, symbol, name]);
         await newQuery(`INSERT INTO ticker_data (ticker_id, date, price) VALUES ($1, $2, $3)`, [id, date, price]);
         await newQuery(`INSERT INTO user_tickers (user_id, ticker_id) VALUES ($1, $2)`, [userId, id])
       await pool.query('COMMIT')
-      console.log('[DEBUG]: Ticker created successfully');
       return;
     } catch (err) {
       const error =  new Error(err.message)

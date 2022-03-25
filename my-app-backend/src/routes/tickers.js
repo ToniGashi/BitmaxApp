@@ -8,8 +8,7 @@ tickerRouter.get('/tickers', authenticateJWT, async function(req, res) {
   console.log('=> STARTED GET TICKER <=');
   try{
     console.log('[DEBUG]: Sending the request to database');
-    const userId = jwt_decode(req.cookies.accessToken).id;
-    const resp = await tickerController.getTicker(userId);
+    const resp = await tickerController.getTicker();
     res.send({
       message: resp
     })

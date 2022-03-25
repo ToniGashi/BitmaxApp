@@ -37,8 +37,7 @@ const App = () => {
   useEffect(() => {
     if(socket) {
       socket.on('message', async (message) => {
-        console.log(message);
-        setTickers(message);
+        setTickers(await fetchData());
       })
       socket.on('disconnected', async (message) => {
         console.log(message);
@@ -76,7 +75,6 @@ const App = () => {
       notify('success');
       await clearForm();
     } catch (err) {
-      console.log(err.response);
       if (createErr) {
         createErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
@@ -92,7 +90,6 @@ const App = () => {
         email, 
         password
       })
-      console.log(resp);
       setIsLoggedIn(true);
       setTickers(await fetchData());
       setCookies('isLoggedIn', 'yes', { path: '/'});
@@ -102,7 +99,8 @@ const App = () => {
       notify('success');
       const newSocket = io("http://localhost:3007");
       setSocket(newSocket);
-      newSocket.emit('userId', jwt_decode(resp.data.accessToken).id)
+      localStorage.setItem('userId', await jwt_decode(resp.data.accessToken).id);
+      setTickers(await fetchData());
       await clearForm();
     } catch (err) {
       console.log(err);
@@ -175,14 +173,16 @@ const App = () => {
   }
 
   const fetchData = async () => {
-    let result;
     try {
-      result = await axios.get('/ticker-management/tickers');
+      const result = await axios.get('/ticker-management/tickers');
+      if(localStorage.getItem('userId')) {
+        result.data.message=result.data.message.filter(ticker => ticker.user_id === localStorage.getItem('userId') || ticker.user_id === null)
+      }
+      return result.data.message;
     } catch (err) {
-      console.log(err);
+      console.log(err.message);
       throw new Error('Error fetching ticker data');
     }
-    return result.data.message;
   }
 
   const clearForm = async () => {

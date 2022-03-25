@@ -3,7 +3,6 @@ const http = require('http');
 const WebSocket = require('ws');
 const tickerController = require('../src/controllers/tickerController');
 const { newQuery } = require('../database/dbFunctions');
-let userId;
 
 const ioSocket = (app) => {
   const server = http.createServer(app);
@@ -31,21 +30,15 @@ const ioSocket = (app) => {
         const tickerByName = await newQuery(`SELECT t.id, t.name, t.symbol, d.Date, d.price FROM tickers t INNER JOIN ticker_data d ON t.id = d.ticker_id WHERE t.name=$1 LIMIT 1`, [JSONMessage.data[0].symbol]);
         if(tickerByName?.[0]?.id && tickerByName[0].price !== JSONMessage.data[0].fairPrice) {
           await tickerController.updateTicker(tickerByName[0].id, tickerByName[0].symbol, tickerByName[0].name, JSONMessage.data[0].fairPrice)
-          if(userId) {
-            io.emit('message', await tickerController.getTicker(userId));
-          }
+          io.emit('message');
         }
       } catch (err) {
         console.log('[SOCKET ERROR]: ', err);
       }
     }
   });
-  
+
   io.on('connection', (socket) => {
-    socket.on('userId', (currentUserId) => {
-      console.log('entered socket userId');
-      userId = currentUserId;
-    })
     socket.on('disconnect', () => {
       console.log('User disconnected');
     })
