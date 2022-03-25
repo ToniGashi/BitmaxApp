@@ -5,9 +5,7 @@ const { authenticateJWT } = require('../../middleware/authJWT')
 const jwt_decode = require('jwt-decode');
 
 tickerRouter.get('/tickers', authenticateJWT, async function(req, res) {
-  console.log('=> STARTED GET TICKER <=');
   try{
-    console.log('[DEBUG]: Sending the request to database');
     const resp = await tickerController.getTicker();
     res.send({
       message: resp
