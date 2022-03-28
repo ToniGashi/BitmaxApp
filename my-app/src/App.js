@@ -4,6 +4,7 @@ import tableIcons from "./MaterialTableIcons";
 import { useCookies } from "react-cookie";
 import './App.css';
 import { io } from "socket.io-client";
+import jwt_decode from "jwt-decode";
 
 const axiosLib = require('axios');
 
@@ -36,8 +37,7 @@ const App = () => {
   useEffect(() => {
     if(socket) {
       socket.on('message', async (message) => {
-        console.log(message);
-        setTickers(message);
+        setTickers(await fetchData());
       })
       socket.on('disconnected', async (message) => {
         console.log(message);
@@ -45,7 +45,14 @@ const App = () => {
       })
     }
   }, [socket])
-  
+
+  useEffect(() => {
+    window.addEventListener("beforeunload", logOut);
+    return () => {
+      window.removeEventListener("beforeunload", logOut);
+    };
+  }, []);
+
   const notify = (notification) => {
     notifyContainer.current.classList.toggle('active')
     notifyType.current.classList.toggle(notification);
@@ -58,7 +65,7 @@ const App = () => {
   const createUser = async() => {
     const createErr = createError.current;
     try {
-      const res = await axios.post('/user', {
+      const res = await axios.post('/user-management/user', {
         email, 
         password
       })
@@ -68,7 +75,6 @@ const App = () => {
       notify('success');
       await clearForm();
     } catch (err) {
-      console.log(err.response);
       if (createErr) {
         createErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
@@ -80,7 +86,7 @@ const App = () => {
   const loginUser = async() => {
     const logErr = logError.current;
     try {
-      await axios.post('/login', {
+      const resp = await axios.post('/user-management/login', {
         email, 
         password
       })
@@ -93,30 +99,31 @@ const App = () => {
       notify('success');
       const newSocket = io("http://localhost:3007");
       setSocket(newSocket);
+      localStorage.setItem('userId', await jwt_decode(resp.data.accessToken).id);
+      setTickers(await fetchData());
       await clearForm();
     } catch (err) {
       console.log(err);
-      if (logErr) {
+      if (logErr && (err.response?.data?.message || err.response?.data?.error?.message)) {
         logErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
       notify('failure');
-      console.log(err);
     }
   }
 
   const logOut = async() => {
     setIsLoggedIn(false);
     setCookies('isLoggedIn', 'no', { path: '/'});
+    setCookies('accessToken', '', { path: '/'});
     await socket.disconnect();
     setSocket(null);
-    setCookies('accessToken', '', { path: '/'});
     await clearForm();
   }
 
   const createTicker = async (newData) => {
     const { price, name, symbol } = newData;
     try {
-      await axios.post('/ticker', {
+      await axios.post('/ticker-management/tickers', {
         price, 
         symbol,
         name
@@ -133,7 +140,7 @@ const App = () => {
   const updateTicker = async (oldData, newData) => {
     const { id:newId, price:newPrice, name:newName, symbol:newSymbol } = newData;
     try {
-      await axios.put('/ticker', {
+      await axios.put('/ticker-management/tickers', {
         id:newId, 
         price: newPrice,
         name: newName,
@@ -151,7 +158,7 @@ const App = () => {
   const deleteTicker = async (oldData) => {
     const { id } = oldData;
     try {
-      await axios.delete('/ticker', {
+      await axios.delete('/ticker-management/tickers', {
         data: {
           id: id
         }
@@ -166,9 +173,16 @@ const App = () => {
   }
 
   const fetchData = async () => {
-    const result = await axios.get('/ticker');
-    setTickers([result.data.message]);
-    return result.data.message;
+    try {
+      const result = await axios.get('/ticker-management/tickers');
+      if(localStorage.getItem('userId')) {
+        result.data.message=result.data.message.filter(ticker => ticker.user_id === localStorage.getItem('userId') || ticker.user_id === null)
+      }
+      return result.data.message;
+    } catch (err) {
+      console.log(err.message);
+      throw new Error('Error fetching ticker data');
+    }
   }
 
   const clearForm = async () => {
