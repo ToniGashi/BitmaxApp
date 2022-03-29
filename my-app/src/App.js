@@ -4,7 +4,6 @@ import tableIcons from "./MaterialTableIcons";
 import { useCookies } from "react-cookie";
 import './App.css';
 import { io } from "socket.io-client";
-import jwt_decode from "jwt-decode";
 
 const axiosLib = require('axios');
 
@@ -37,10 +36,9 @@ const App = () => {
   useEffect(() => {
     if(socket) {
       socket.on('message', async (message) => {
-        setTickers(await fetchData());
+        setTickers(message);
       })
       socket.on('disconnected', async (message) => {
-        console.log(message);
         logOut();
       })
     }
@@ -97,10 +95,10 @@ const App = () => {
         logErr.innerHTML = '';
       }
       notify('success');
-      const newSocket = io("http://localhost:3007");
+      const newSocket = io("http://localhost:3007", {
+        query: { token: resp.data.accessToken }
+      });
       setSocket(newSocket);
-      localStorage.setItem('userId', await jwt_decode(resp.data.accessToken).id);
-      setTickers(await fetchData());
       await clearForm();
     } catch (err) {
       console.log(err);
@@ -128,7 +126,6 @@ const App = () => {
         symbol,
         name
       })
-      setTickers(await fetchData());
       notify('success');
     } catch (err) {
       console.log(err.message);
@@ -146,7 +143,6 @@ const App = () => {
         name: newName,
         symbol: newSymbol
       })
-      setTickers(await fetchData());
       notify('success');
     } catch (err) {
       console.log(err.message);
@@ -163,7 +159,6 @@ const App = () => {
           id: id
         }
       })
-      setTickers(await fetchData());
       notify('success');
     } catch (err) {
       console.log(err.message);
@@ -175,9 +170,6 @@ const App = () => {
   const fetchData = async () => {
     try {
       const result = await axios.get('/ticker-management/tickers');
-      if(localStorage.getItem('userId')) {
-        result.data.message=result.data.message.filter(ticker => ticker.user_id === localStorage.getItem('userId') || ticker.user_id === null)
-      }
       return result.data.message;
     } catch (err) {
       console.log(err.message);
@@ -218,26 +210,26 @@ const App = () => {
                   onRowDeleteCancelled: rowData => console.log('Row deliting cancelled'),
                   onRowAdd: (newData) => {
                     return new Promise((resolve, reject) => {
-                      setTimeout(() => {
-                        createTicker(newData);
+                      setTimeout(async () => {
+                        await createTicker(newData);
                         resolve();
-                      },1000);
+                      });
                     })
                   },
                   onRowUpdate: (newData, oldData) => {
                     return new Promise((resolve, reject) => {
-                      setTimeout(() => {
-                        updateTicker(oldData, newData);
+                      setTimeout(async () => {
+                        await updateTicker(oldData, newData);
                         resolve();
-                      },1000)
+                      })
                     });
                   },
                   onRowDelete: (oldData) =>{
                     return new Promise((resolve, reject) => {
-                      setTimeout(() => {
-                      deleteTicker(oldData);
+                      setTimeout(async () => {
+                      await deleteTicker(oldData);
                       resolve();
-                      },1000);
+                      });
                     })
                   }
                 }}
