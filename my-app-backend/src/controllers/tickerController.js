@@ -7,7 +7,7 @@ const tickerController = {
   async getTickerData(tickerId) {
     return newQuery(`SELECT * FROM ticker_data WHERE ticker_data.ticker_id=$1`, [tickerId]);
   },
-  async getTicker() {
+  async getTicker(userId) {
     return newQuery(
       `SELECT DISTINCT ON (tickers.id)
       tickers.*, td.price, td.Date, u.id as user_id
@@ -17,7 +17,9 @@ const tickerController = {
       LEFT JOIN user_tickers ut
       ON ut.ticker_id = tickers.id
       LEFT JOIN users u
-      ON u.id = ut.user_id`);
+      ON u.id = ut.user_id
+      WHERE u.id=$1 OR tickers.name IN ('XBTUSD', 'ETHUSD', 'LTCUSD')
+      ORDER BY tickers.id, td.Date DESC`, [userId]);
   },
   async updateTicker(id, symbol, name, price){
     const date = new Date();
