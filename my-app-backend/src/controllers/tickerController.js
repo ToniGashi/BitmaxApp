@@ -7,6 +7,12 @@ const tickerController = {
   async getTickerData(tickerId) {
     return newQuery(`SELECT * FROM ticker_data WHERE ticker_data.ticker_id=$1`, [tickerId]);
   },
+  async getTickerDataByDate(tickerId, selectBoxValue) {
+    return newQuery(`SELECT * FROM ticker_data WHERE ticker_data.ticker_id=$1 AND ticker_data.Date>$2`, [tickerId, selectBoxValue]);
+  },
+  async getTickerById(tickerId) {
+    return newQuery(`SELECT * FROM tickers WHERE tickers.id=$1`, [tickerId]);
+  },
   async getTicker(userId) {
     return newQuery(
       `SELECT DISTINCT ON (tickers.id)

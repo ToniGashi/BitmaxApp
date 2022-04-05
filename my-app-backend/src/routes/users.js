@@ -35,7 +35,6 @@ userRouter.post('/login', async function(req, res) {
     return res.send({
       status: 200,
       message: 'User login successfully',
-      accessToken: accessToken
     })
   } catch (err) {
     console.log('[ERROR]: ', err.message);
