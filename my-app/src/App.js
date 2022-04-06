@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import MaterialTable from "@material-table/core";
 import tableIcons from "./MaterialTableIcons";
 import { useCookies } from "react-cookie";
 import './App.css';
+import { io } from "socket.io-client";
 
 const axiosLib = require('axios');
 
@@ -14,7 +15,8 @@ const axios = axiosLib.create({
 const App = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [socket, setSocket] = useState(null);
   const [tickers, setTickers] = useState([]);
   const [cookies, setCookies] = useCookies(['isLoggedIn']);
   const [columns, setColumns] = useState([
@@ -22,7 +24,6 @@ const App = () => {
     {title: "name", field: "name"},
     {title: "price", field: "price", type:'numeric'}
   ]);
-
   const logEmail = useRef(null);
   const logPassword = useRef(null);
   const createEmail = useRef(null);
@@ -31,6 +32,24 @@ const App = () => {
   const notifyType = useRef(null);
   const logError = useRef(null);
   const createError = useRef(null);
+
+  useEffect(() => {
+    if(socket) {
+      socket.on('message', async (message) => {
+        setTickers(message);
+      })
+      socket.on('disconnected', async (message) => {
+        logOut();
+      })
+    }
+  }, [socket])
+
+  useEffect(() => {
+    window.addEventListener("beforeunload", logOut);
+    return () => {
+      window.removeEventListener("beforeunload", logOut);
+    };
+  }, []);
 
   const notify = (notification) => {
     notifyContainer.current.classList.toggle('active')
@@ -44,7 +63,7 @@ const App = () => {
   const createUser = async() => {
     const createErr = createError.current;
     try {
-      const res = await axios.post('/user', {
+      const res = await axios.post('/user-management/user', {
         email, 
         password
       })
@@ -54,7 +73,6 @@ const App = () => {
       notify('success');
       await clearForm();
     } catch (err) {
-      console.log(err.response);
       if (createErr) {
         createErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
@@ -66,7 +84,7 @@ const App = () => {
   const loginUser = async() => {
     const logErr = logError.current;
     try {
-      await axios.post('/login', {
+      const resp = await axios.post('/user-management/login', {
         email, 
         password
       })
@@ -77,14 +95,17 @@ const App = () => {
         logErr.innerHTML = '';
       }
       notify('success');
+      const newSocket = io("http://localhost:3007", {
+        query: { token: resp.data.accessToken }
+      });
+      setSocket(newSocket);
       await clearForm();
     } catch (err) {
       console.log(err);
-      if (logErr) {
+      if (logErr && (err.response?.data?.message || err.response?.data?.error?.message)) {
         logErr.innerHTML = err.response.data.message || err.response.data.error.message;
       }
       notify('failure');
-      console.log(err);
     }
   }
 
@@ -92,18 +113,19 @@ const App = () => {
     setIsLoggedIn(false);
     setCookies('isLoggedIn', 'no', { path: '/'});
     setCookies('accessToken', '', { path: '/'});
+    await socket.disconnect();
+    setSocket(null);
     await clearForm();
   }
 
   const createTicker = async (newData) => {
     const { price, name, symbol } = newData;
     try {
-      await axios.post('/ticker', {
+      await axios.post('/ticker-management/tickers', {
         price, 
         symbol,
         name
       })
-      setTickers(await fetchData());
       notify('success');
     } catch (err) {
       console.log(err.message);
@@ -115,13 +137,12 @@ const App = () => {
   const updateTicker = async (oldData, newData) => {
     const { id:newId, price:newPrice, name:newName, symbol:newSymbol } = newData;
     try {
-      await axios.put('/ticker', {
+      await axios.put('/ticker-management/tickers', {
         id:newId, 
         price: newPrice,
         name: newName,
         symbol: newSymbol
       })
-      setTickers(await fetchData());
       notify('success');
     } catch (err) {
       console.log(err.message);
@@ -133,12 +154,11 @@ const App = () => {
   const deleteTicker = async (oldData) => {
     const { id } = oldData;
     try {
-      await axios.delete('/ticker', {
+      await axios.delete('/ticker-management/tickers', {
         data: {
           id: id
         }
       })
-      setTickers(await fetchData());
       notify('success');
     } catch (err) {
       console.log(err.message);
@@ -148,8 +168,13 @@ const App = () => {
   }
 
   const fetchData = async () => {
-    const result = await axios.get('/ticker');
-    return result.data.message.rows;
+    try {
+      const result = await axios.get('/ticker-management/tickers');
+      return result.data.message;
+    } catch (err) {
+      console.log(err.message);
+      throw new Error('Error fetching ticker data');
+    }
   }
 
   const clearForm = async () => {
@@ -178,33 +203,33 @@ const App = () => {
               <MaterialTable
                 title="Tickers"
                 editable={{
-                  isEditable: rowData => true,
-                  isDeletable: rowData => true,
+                  isEditable: rowData =>  rowData.symbol!=='XBT' && rowData.symbol!=='LTC' && rowData.symbol!=='ETH',
+                  isDeletable: rowData => rowData.symbol!=='XBT' && rowData.symbol!=='LTC' && rowData.symbol!=='ETH',
                   onRowAddCancelled: rowData => console.log('Row adding cancelled'),
                   onRowUpdateCancelled: rowData => console.log('Row editing cancelled'),
                   onRowDeleteCancelled: rowData => console.log('Row deliting cancelled'),
                   onRowAdd: (newData) => {
                     return new Promise((resolve, reject) => {
-                      setTimeout(() => {
-                        createTicker(newData);
+                      setTimeout(async () => {
+                        await createTicker(newData);
                         resolve();
-                      },1000);
+                      });
                     })
                   },
                   onRowUpdate: (newData, oldData) => {
                     return new Promise((resolve, reject) => {
-                      setTimeout(() => {
-                        updateTicker(oldData, newData);
+                      setTimeout(async () => {
+                        await updateTicker(oldData, newData);
                         resolve();
-                      },1000)
+                      })
                     });
                   },
                   onRowDelete: (oldData) =>{
                     return new Promise((resolve, reject) => {
-                      setTimeout(() => {
-                      deleteTicker(oldData);
+                      setTimeout(async () => {
+                      await deleteTicker(oldData);
                       resolve();
-                      },1000);
+                      });
                     })
                   }
                 }}
