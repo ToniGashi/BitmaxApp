@@ -1,5 +1,5 @@
 const { v1: uuidv1 } = require('uuid');
-const {newQuery} = require('../../database/dbFunctions');
+const {newQuery} = require('../database/dbFunctions');
 const bcrypt = require('bcrypt')
 
 function validateEmail(email) {

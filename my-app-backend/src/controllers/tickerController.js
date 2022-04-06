@@ -1,5 +1,5 @@
-const {newQuery} = require('../../database/dbFunctions');
-const { dbConnector } = require('../../database/dbConnect');
+const {newQuery} = require('../database/dbFunctions');
+const { dbConnector } = require('../database/dbConnect');
 const { v1: uuidv1 } = require('uuid');
 const pool = dbConnector();
 

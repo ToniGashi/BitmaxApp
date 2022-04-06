@@ -1,7 +1,7 @@
 const express = require('express')
 const tickerRouter = express.Router()
-const tickerController = require('../controllers/tickerController.js')
-const { authenticateJWT } = require('../../middleware/authJWT')
+const tickerController = require('../controllers/tickerController')
+const { authenticateJWT } = require('../middleware/authJWT')
 const jwt_decode = require('jwt-decode');
 
 tickerRouter.get('/ticker', authenticateJWT, async function(req, res) { 

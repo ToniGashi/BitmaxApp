@@ -1,7 +1,7 @@
 const express = require('express');
 const userRouter = express.Router();
 const usersController = require('../controllers/userController.js');
-const { authenticateJWT } = require('../../middleware/authJWT');
+const { authenticateJWT } = require('../middleware/authJWT');
 const jwt = require('jsonwebtoken');
 
 userRouter.post('/user', authenticateJWT, async function(req, res) {
