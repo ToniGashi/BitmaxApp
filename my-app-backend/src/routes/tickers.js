@@ -21,7 +21,8 @@ tickerRouter.get('/ticker', authenticateJWT, async function(req, res) {
 
 tickerRouter.get('/tickers', authenticateJWT, async function(req, res) {
   try {
-    const resp = await tickerController.getTicker();
+    const userId = jwt_decode(req.cookies.accessToken).id;
+    const resp = await tickerController.getTicker(userId);
     res.send({
       message: resp
     })
@@ -121,6 +122,23 @@ tickerRouter.get('/tickerDataByDate', authenticateJWT, async function(req, res) 
     const {tickerId, selectBoxValue} = req.query;
     console.log('[DEBUG]: Sending the request to database');
     const resp = await tickerController.getTickerDataByDate(tickerId, selectBoxValue);
+    res.send({
+      message: resp
+    })
+  } catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+})
+
+tickerRouter.post('/tickerDataFromCSV', authenticateJWT, async function(req, res) {
+  console.log('=> STARTED POST TICKER DATA FROM CSV <=');
+  try{
+    const {id, name, symbol, arrayOfData} = req.body;
+    console.log('[DEBUG]: Sending the request to database');
+    const resp = await tickerController.updateTickerFromCSV(id,symbol,name,arrayOfData);
     res.send({
       message: resp
     })

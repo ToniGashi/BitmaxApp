@@ -34,6 +34,14 @@ const tickerController = {
       await newQuery(`INSERT INTO ticker_data (Date,price,ticker_id) VALUES ($1,$2,$3)`, [date, price, id]);
     await pool.query('COMMIT')
   },
+  async updateTickerFromCSV(id, symbol, name, dataArray) {
+    await pool.query('BEGIN')
+      dataArray.forEach(async (element) => {
+        await newQuery(`UPDATE tickers SET name=$1, symbol=$2 WHERE id=$3`, [name, symbol, id]);
+        await newQuery(`INSERT INTO ticker_data (Date,price,ticker_id) VALUES ($1,$2,$3)`, [element.date, element.price, id]);
+      })
+    await pool.query('COMMIT')
+  },
   async createTicker(price, symbol, name, userId) {
     const id = uuidv1();
   

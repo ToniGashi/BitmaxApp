@@ -71,10 +71,10 @@ const Home = () => {
                 });
               })
             },
-            onRowUpdate: (newData, oldData) => {
+            onRowUpdate: (newData) => {
               return new Promise((resolve, reject) => {
                 setTimeout(async () => {
-                  await updateTicker(oldData, newData);
+                  await updateTicker(newData);
                   resolve();
                 })
               });

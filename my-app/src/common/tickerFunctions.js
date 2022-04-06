@@ -42,7 +42,7 @@ export const createTicker = async (newData) => {
   }
 }
 
-export const updateTicker = async (oldData, newData) => {
+export const updateTicker = async (newData) => {
   const { id:newId, price:newPrice, name:newName, symbol:newSymbol } = newData;
   try {
     await axios.put('/ticker-management/tickers', {
@@ -53,6 +53,21 @@ export const updateTicker = async (oldData, newData) => {
     })
   } catch (err) {
     console.log(err.message);
+  }
+}
+
+export const updateTickerFromCSV = async (id, name, symbol, arrayOfData) => { //newData includes the price and Date for the ticker
+  try {
+    const result = await axios.post('/ticker-management/tickerDataFromCSV', { 
+      id,
+      name,
+      symbol,
+      arrayOfData
+    });
+    return result.data.message;
+  } catch (err) {
+    console.log(err.message);
+    throw new Error('Error fetching ticker data');
   }
 }
 
