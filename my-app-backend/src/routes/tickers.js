@@ -4,8 +4,23 @@ const tickerController = require('../controllers/tickerController.js')
 const { authenticateJWT } = require('../../middleware/authJWT')
 const jwt_decode = require('jwt-decode');
 
+tickerRouter.get('/ticker', authenticateJWT, async function(req, res) { 
+  try {
+    const {tickerId} = req.query;
+    const resp = await tickerController.getTickerById(tickerId);
+    res.send({
+      message: resp
+    })
+  } catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+});
+
 tickerRouter.get('/tickers', authenticateJWT, async function(req, res) {
-  try{
+  try {
     const resp = await tickerController.getTicker();
     res.send({
       message: resp
@@ -89,6 +104,23 @@ tickerRouter.get('/tickerData', authenticateJWT, async function(req, res) {
     const {tickerId} = req.query;
     console.log('[DEBUG]: Sending the request to database');
     const resp = await tickerController.getTickerData(tickerId);
+    res.send({
+      message: resp
+    })
+  } catch (err) {
+    console.log('[ERROR]: ', err.message);
+    return res.status(err.statusCode || 500).send({
+      error: { message: err.message },
+    });
+  }
+})
+
+tickerRouter.get('/tickerDataByDate', authenticateJWT, async function(req, res) {
+  console.log('=> STARTED GET TICKER DATA BY DATE <=');
+  try{
+    const {tickerId, selectBoxValue} = req.query;
+    console.log('[DEBUG]: Sending the request to database');
+    const resp = await tickerController.getTickerDataByDate(tickerId, selectBoxValue);
     res.send({
       message: resp
     })
