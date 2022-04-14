@@ -1,7 +1,7 @@
 const jwt_decode = require("jwt-decode");
 const http = require('http');
 const WebSocket = require('ws');
-const tickerController = require('../src/controllers/tickerController');
+const tickerController = require('../controllers/tickerController');
 const { newQuery } = require('../database/dbFunctions');
 
 const ioSocket = (app) => {

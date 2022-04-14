@@ -20,7 +20,10 @@ const Home = () => {
   ];
 
   useEffect(() => {
-    const s = io("http://localhost:3007", {
+    if(!process.env.REACT_APP_SOCKET_URL) {
+      console.error("No REACT_APP_SOCKET_URL specified in the .env file")
+    }
+    const s = io(process.env.REACT_APP_SOCKET_URL, {
       query: { token: cookies.accessToken }
     })
     setSocket(s);
@@ -71,10 +74,10 @@ const Home = () => {
                 });
               })
             },
-            onRowUpdate: (newData, oldData) => {
+            onRowUpdate: (newData) => {
               return new Promise((resolve, reject) => {
                 setTimeout(async () => {
-                  await updateTicker(oldData, newData);
+                  await updateTicker(newData);
                   resolve();
                 })
               });

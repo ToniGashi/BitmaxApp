@@ -3,10 +3,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require("cors");
 const cookieParser = require('cookie-parser');
-const { checkRequirements } = require('../middleware/config');
+const { checkRequirements } = require('./config/config');
 const app = express();
-const ioSocket = require('../socket/socket')(app);
-const { authenticateJWT } = require('../middleware/authJWT');
+const ioSocket = require('./socket/socket')(app);
+const { authenticateJWT } = require('./middleware/authJWT');
 
 try {
   checkRequirements();
